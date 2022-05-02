@@ -12,3 +12,10 @@ dependencies = [
 [[package]]
 name = "read_input"
 version = "0.1.0"
+
+[[package]]
+name = "two"
+version = "0.1.0"
+dependencies = [
+ "read_input",
+]
