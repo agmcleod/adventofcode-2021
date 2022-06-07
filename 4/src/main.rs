@@ -85,27 +85,49 @@ fn main() -> io::Result<()> {
     let callout_numbers: Vec<&str> = lines.next().unwrap().split(",").collect();
     let mut boards = parse_boards(lines);
 
-    'outer: for number in callout_numbers {
+    let mut first_board_score = 0;
+    let mut last_board_score = 0;
+
+    for number in callout_numbers {
+        let mut board_score = 0;
         for board in &mut boards {
             if board.numbers.contains(number) {
                 board.called_numbers.insert(number.to_owned());
             }
+        }
 
-            // possible this may need to happen as a second loop
-            if check_if_board_has_won(board) {
-                let mut sum = 0;
-                for row in &board.grid {
-                    for col in row {
-                        if !board.called_numbers.contains(col) {
-                            sum += parse_num(col);
+        boards = boards
+            .iter()
+            .filter(|board| {
+                if check_if_board_has_won(board) {
+                    let mut sum = 0;
+                    for row in &board.grid {
+                        for col in row {
+                            if !board.called_numbers.contains(col) {
+                                sum += parse_num(col);
+                            }
                         }
                     }
+                    board_score = sum * parse_num(number);
+                    if first_board_score == 0 {
+                        first_board_score = board_score
+                    }
+                    false
+                } else {
+                    true
                 }
-                println!("{}", sum * parse_num(number));
-                break 'outer;
-            }
+            })
+            .cloned()
+            .collect();
+
+        if boards.len() == 0 {
+            last_board_score = board_score;
+            break;
         }
     }
+
+    println!("p1 {}", first_board_score);
+    println!("p2 {}", last_board_score);
 
     Ok(())
 }
