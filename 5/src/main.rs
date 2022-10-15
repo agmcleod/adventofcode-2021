@@ -3,7 +3,7 @@ use std::io::Result;
 
 use geo::{
     line_intersection::{line_intersection, LineIntersection},
-    Line, CoordsIter,
+    CoordsIter, Line,
 };
 use read_input::read_text;
 
@@ -94,7 +94,7 @@ fn get_intersection_points(segments: &Vec<Line<f32>>) -> HashSet<(i32, i32)> {
                                 did_increment = true;
                             }
                             if !did_increment {
-                                break
+                                break;
                             }
                         }
                     }
@@ -120,4 +120,42 @@ fn main() -> Result<()> {
     println!("{}", intersection_points.len());
 
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use geo::Line;
+
+    use crate::get_intersection_points;
+
+    #[test]
+    fn test_line_intersections_return_correct_points() {
+        let segments = vec![
+            Line {
+                start: (1.0, 1.0).into(),
+                end: (5.0, 5.0).into(),
+            },
+            Line {
+                start: (2.0, 2.0).into(),
+                end: (8.0, 8.0).into(),
+            },
+        ];
+
+        let intersection_points = get_intersection_points(&segments);
+        assert_eq!(intersection_points.len(), 4);
+
+        let segments = vec![
+            Line {
+                start: (1.0, 1.0).into(),
+                end: (5.0, 5.0).into(),
+            },
+            Line {
+                start: (8.0, 2.0).into(),
+                end: (3.0, 7.0).into(),
+            },
+        ];
+
+        let intersection_points = get_intersection_points(&segments);
+        assert_eq!(intersection_points.len(), 1);
+    }
 }
