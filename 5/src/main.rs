@@ -124,6 +124,8 @@ fn main() -> Result<()> {
 
 #[cfg(test)]
 mod test {
+    use std::iter::Inspect;
+
     use geo::Line;
 
     use crate::get_intersection_points;
@@ -143,6 +145,10 @@ mod test {
 
         let intersection_points = get_intersection_points(&segments);
         assert_eq!(intersection_points.len(), 4);
+        assert!(intersection_points.contains(&(2, 2)));
+        assert!(intersection_points.contains(&(3, 3)));
+        assert!(intersection_points.contains(&(4, 4)));
+        assert!(intersection_points.contains(&(5, 5)));
 
         let segments = vec![
             Line {
@@ -157,5 +163,60 @@ mod test {
 
         let intersection_points = get_intersection_points(&segments);
         assert_eq!(intersection_points.len(), 1);
+        assert!(intersection_points.contains(&(5, 5)));
+    }
+
+    #[test]
+    fn test_line_intersections_return_correct_points_when_reverse_delta() {
+        let segments = vec![
+            Line {
+                start: (5.0, 5.0).into(),
+                end: (1.0, 1.0).into(),
+            },
+            Line {
+                start: (8.0, 8.0).into(),
+                end: (2.0, 2.0).into(),
+            },
+        ];
+
+        let intersection_points = get_intersection_points(&segments);
+        assert_eq!(intersection_points.len(), 4);
+        assert!(intersection_points.contains(&(2, 2)));
+        assert!(intersection_points.contains(&(3, 3)));
+        assert!(intersection_points.contains(&(4, 4)));
+        assert!(intersection_points.contains(&(5, 5)));
+
+        let segments = vec![
+            Line {
+                start: (5.0, 5.0).into(),
+                end: (1.0, 1.0).into(),
+            },
+            Line {
+                start: (3.0, 7.0).into(),
+                end: (8.0, 2.0).into(),
+            },
+        ];
+
+        let intersection_points = get_intersection_points(&segments);
+        assert_eq!(intersection_points.len(), 1);
+        assert!(intersection_points.contains(&(5, 5)));
+    }
+
+    #[test]
+    fn test_diagonal_intersects_with_horiontal() {
+        let segments = vec![
+            Line {
+                start: (5.0, 5.0).into(),
+                end: (1.0, 1.0).into(),
+            },
+            Line {
+                start: (1.0, 3.0).into(),
+                end: (7.0, 3.0).into(),
+            },
+        ];
+
+        let intersection_points = get_intersection_points(&segments);
+        assert_eq!(intersection_points.len(), 1);
+        assert!(intersection_points.contains(&(3, 3)));
     }
 }
