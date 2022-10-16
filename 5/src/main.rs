@@ -1,15 +1,22 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::io::Result;
 
-use geo::{
-    line_intersection::{line_intersection, LineIntersection},
-    CoordsIter, Line,
-};
 use read_input::read_text;
 
-fn get_number(value: Option<&str>) -> f32 {
+struct Line {
+    start: (i32, i32),
+    end: (i32, i32),
+}
+
+impl Line {
+    fn delta(&self) -> (i32, i32) {
+        (self.end.0 - self.start.0, self.end.1 - self.start.1)
+    }
+}
+
+fn get_number(value: Option<&str>) -> i32 {
     if let Some(value) = value {
-        match value.parse::<f32>() {
+        match value.parse::<i32>() {
             Ok(n) => n,
             Err(_err) => panic!("Could not parse number {:?}", value),
         }
@@ -18,7 +25,7 @@ fn get_number(value: Option<&str>) -> f32 {
     }
 }
 
-fn get_coords_from_point_str(point: Option<&str>) -> (f32, f32) {
+fn get_coords_from_point_str(point: Option<&str>) -> (i32, i32) {
     if let Some(point) = point {
         let mut axis = point.split(",");
         let x = get_number(axis.next());
@@ -38,7 +45,7 @@ fn get_insert_coord_value(delta: i32, start: i32, incr: i32) -> i32 {
     }
 }
 
-fn get_line_segments(text: &String, include_diagonal: bool) -> Vec<Line<f32>> {
+fn get_line_segments(text: &String, include_diagonal: bool) -> Vec<Line> {
     let mut segments = Vec::new();
 
     for line in text.lines() {
@@ -57,48 +64,38 @@ fn get_line_segments(text: &String, include_diagonal: bool) -> Vec<Line<f32>> {
     segments
 }
 
-fn get_intersection_points(segments: &Vec<Line<f32>>) -> HashSet<(i32, i32)> {
-    let mut intersection_points = HashSet::new();
-    for (i, line) in segments.iter().enumerate() {
-        for line_2 in segments.iter().skip(i + 1) {
-            let overlap = line_intersection(*line, *line_2);
-            if let Some(overlap) = overlap {
-                match overlap {
-                    LineIntersection::SinglePoint {
-                        intersection,
-                        is_proper,
-                    } => {
-                        intersection_points.insert((intersection.x as i32, intersection.y as i32));
-                    }
-                    LineIntersection::Collinear { intersection } => {
-                        let delta = intersection.delta();
-                        let sx = intersection.start.x as i32;
-                        let sy = intersection.start.y as i32;
-                        let mut x_incr = 0;
-                        let mut y_incr = 0;
-                        let delta_x = delta.x.abs() as i32;
-                        let delta_y = delta.y.abs() as i32;
-                        loop {
-                            let insert_x = get_insert_coord_value(delta.x as i32, sx, x_incr);
-                            let insert_y = get_insert_coord_value(delta.y as i32, sy, y_incr);
+fn get_grid_of_line_coords(segments: &Vec<Line>) -> HashMap<(i32, i32), i32> {
+    let mut intersection_points = HashMap::new();
+    for line in segments {
+        let delta = line.delta();
+        let sx = line.start.0;
+        let sy = line.start.1;
+        let mut x_incr = 0;
+        let mut y_incr = 0;
+        let delta_x = delta.0.abs();
+        let delta_y = delta.1.abs();
+        loop {
+            let insert_x = get_insert_coord_value(delta.0, sx, x_incr);
+            let insert_y = get_insert_coord_value(delta.1, sy, y_incr);
 
-                            intersection_points.insert((insert_x, insert_y));
+            if intersection_points.contains_key(&(insert_x, insert_y)) {
+                let count = intersection_points.get_mut(&(insert_x, insert_y)).unwrap();
+                *count += 1;
+            } else {
+                intersection_points.insert((insert_x, insert_y), 1);
+            }
 
-                            let mut did_increment = false;
-                            if delta_x > 0 && x_incr < delta_x {
-                                x_incr += 1;
-                                did_increment = true;
-                            }
-                            if delta_y > 0 && y_incr < delta_y {
-                                y_incr += 1;
-                                did_increment = true;
-                            }
-                            if !did_increment {
-                                break;
-                            }
-                        }
-                    }
-                }
+            let mut did_increment = false;
+            if delta_x > 0 && x_incr < delta_x {
+                x_incr += 1;
+                did_increment = true;
+            }
+            if delta_y > 0 && y_incr < delta_y {
+                y_incr += 1;
+                did_increment = true;
+            }
+            if !did_increment {
+                break;
             }
         }
     }
@@ -110,113 +107,26 @@ fn main() -> Result<()> {
     let text = read_text("5/input.txt")?;
 
     let segments = get_line_segments(&text, false);
-    let intersection_points = get_intersection_points(&segments);
+    let intersection_points = get_grid_of_line_coords(&segments);
 
-    println!("{}", intersection_points.len());
+    println!(
+        "{}",
+        intersection_points
+            .iter()
+            .filter(|&(_coord, count)| { *count > 1 })
+            .count()
+    );
 
     let segments = get_line_segments(&text, true);
-    let intersection_points = get_intersection_points(&segments);
+    let intersection_points = get_grid_of_line_coords(&segments);
 
-    println!("{}", intersection_points.len());
+    println!(
+        "{}",
+        intersection_points
+            .iter()
+            .filter(|&(_coord, count)| { *count > 1 })
+            .count()
+    );
 
     Ok(())
-}
-
-#[cfg(test)]
-mod test {
-    use std::iter::Inspect;
-
-    use geo::Line;
-
-    use crate::get_intersection_points;
-
-    #[test]
-    fn test_line_intersections_return_correct_points() {
-        let segments = vec![
-            Line {
-                start: (1.0, 1.0).into(),
-                end: (5.0, 5.0).into(),
-            },
-            Line {
-                start: (2.0, 2.0).into(),
-                end: (8.0, 8.0).into(),
-            },
-        ];
-
-        let intersection_points = get_intersection_points(&segments);
-        assert_eq!(intersection_points.len(), 4);
-        assert!(intersection_points.contains(&(2, 2)));
-        assert!(intersection_points.contains(&(3, 3)));
-        assert!(intersection_points.contains(&(4, 4)));
-        assert!(intersection_points.contains(&(5, 5)));
-
-        let segments = vec![
-            Line {
-                start: (1.0, 1.0).into(),
-                end: (5.0, 5.0).into(),
-            },
-            Line {
-                start: (8.0, 2.0).into(),
-                end: (3.0, 7.0).into(),
-            },
-        ];
-
-        let intersection_points = get_intersection_points(&segments);
-        assert_eq!(intersection_points.len(), 1);
-        assert!(intersection_points.contains(&(5, 5)));
-    }
-
-    #[test]
-    fn test_line_intersections_return_correct_points_when_reverse_delta() {
-        let segments = vec![
-            Line {
-                start: (5.0, 5.0).into(),
-                end: (1.0, 1.0).into(),
-            },
-            Line {
-                start: (8.0, 8.0).into(),
-                end: (2.0, 2.0).into(),
-            },
-        ];
-
-        let intersection_points = get_intersection_points(&segments);
-        assert_eq!(intersection_points.len(), 4);
-        assert!(intersection_points.contains(&(2, 2)));
-        assert!(intersection_points.contains(&(3, 3)));
-        assert!(intersection_points.contains(&(4, 4)));
-        assert!(intersection_points.contains(&(5, 5)));
-
-        let segments = vec![
-            Line {
-                start: (5.0, 5.0).into(),
-                end: (1.0, 1.0).into(),
-            },
-            Line {
-                start: (3.0, 7.0).into(),
-                end: (8.0, 2.0).into(),
-            },
-        ];
-
-        let intersection_points = get_intersection_points(&segments);
-        assert_eq!(intersection_points.len(), 1);
-        assert!(intersection_points.contains(&(5, 5)));
-    }
-
-    #[test]
-    fn test_diagonal_intersects_with_horiontal() {
-        let segments = vec![
-            Line {
-                start: (5.0, 5.0).into(),
-                end: (1.0, 1.0).into(),
-            },
-            Line {
-                start: (1.0, 3.0).into(),
-                end: (7.0, 3.0).into(),
-            },
-        ];
-
-        let intersection_points = get_intersection_points(&segments);
-        assert_eq!(intersection_points.len(), 1);
-        assert!(intersection_points.contains(&(3, 3)));
-    }
 }
