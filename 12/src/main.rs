@@ -10,6 +10,27 @@ fn add_connection(connections: &mut HashMap<String, Vec<String>>, key: &str, val
     connections.get_mut(key).unwrap().push(value.to_string());
 }
 
+fn traverse_paths(
+    mut path: Vec<String>,
+    connections: &HashMap<String, Vec<String>>,
+    cave: &String,
+) -> Vec<Vec<String>> {
+    let next_connections = connections.get(cave).unwrap();
+    let mut completed_paths = Vec::new();
+    for conn in next_connections {
+        if *conn == "end" {
+            let mut path = path.clone();
+            path.push(conn.to_owned());
+            completed_paths.push(path);
+        // is a small cave
+        } else if *conn == conn.to_lowercase() {
+        } else {
+        }
+    }
+
+    completed_paths
+}
+
 fn main() -> Result<()> {
     let text = read_text("12/input.txt")?;
 
@@ -26,13 +47,9 @@ fn main() -> Result<()> {
 
     let mut next_connections = connections.get("start").unwrap();
     let mut paths = Vec::new();
-    loop {
-        for conn in next_connections {}
+    paths.push(vec!["start".to_string()]);
 
-        if next_connections.len() == 0 {
-            break;
-        }
-    }
+    traverse_paths(paths, &connections, "start");
 
     Ok(())
 }
