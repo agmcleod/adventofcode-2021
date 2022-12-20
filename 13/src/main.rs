@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::Result;
 
 use read_input::read_text;
@@ -19,6 +19,27 @@ fn add_value_to_coord(map: &mut HashMap<usize, usize>, key: usize) {
     } else {
         map.insert(key, 1);
     }
+}
+
+fn get_merged_results(
+    x_coords: &HashMap<usize, HashMap<usize, usize>>,
+    y_coords: &HashMap<usize, HashMap<usize, usize>>,
+) -> HashSet<(usize, usize)> {
+    let mut results = HashSet::new();
+
+    for (x, ys) in x_coords.iter() {
+        for (y, _) in ys {
+            results.insert((*x, *y));
+        }
+    }
+
+    for (y, xs) in y_coords.iter() {
+        for (x, _) in xs {
+            results.insert((*x, *y));
+        }
+    }
+
+    results
 }
 
 fn flip_on_axis(
@@ -60,17 +81,12 @@ fn flip_on_axis(
     }
 }
 
-fn count_coords(coords: &HashMap<usize, HashMap<usize, usize>>) -> usize {
-    coords.iter().fold(0, |sum, (_, sub_coords)| {
-        sum + sub_coords.values().sum::<usize>()
-    })
-}
-
 fn main() -> Result<()> {
     let text = read_text("13/input.txt")?;
 
     let mut x_coords: HashMap<usize, HashMap<usize, usize>> = HashMap::new();
     let mut y_coords: HashMap<usize, HashMap<usize, usize>> = HashMap::new();
+    let mut printed_part_one = false;
     for line in text.lines() {
         if line.contains("fold along") {
             let fold_text = line.replace("fold along ", "");
@@ -87,17 +103,19 @@ fn main() -> Result<()> {
                 }
                 _ => panic!("Invalid value for axis: {} in line: {}", axis, line),
             }
-            let x_coords_count = count_coords(&x_coords);
-            let y_coords_count = count_coords(&y_coords);
-
-            if x_coords_count != y_coords_count {
-                panic!(
-                    "Coord sets should be equal\n{} == {}!\n\n{:?}\n\n{:?}",
-                    x_coords_count, y_coords_count, x_coords, y_coords
-                );
+            let merged_coords = get_merged_results(&x_coords, &y_coords);
+            if !printed_part_one {
+                printed_part_one = true;
+                println!("{}", merged_coords.len());
             }
-            println!("{}", x_coords_count);
-            break;
+
+            x_coords.clear();
+            y_coords.clear();
+
+            for coord in &merged_coords {
+                add_coord_to_map(&mut x_coords, coord.0, coord.1);
+                add_coord_to_map(&mut y_coords, coord.1, coord.0);
+            }
         } else {
             let mut iter = line.split(",");
             if line.len() == 0 {
@@ -109,6 +127,29 @@ fn main() -> Result<()> {
             add_coord_to_map(&mut x_coords, x, y);
             add_coord_to_map(&mut y_coords, y, x);
         }
+    }
+
+    let mut x_range = (usize::MAX, 0);
+    let mut y_range = (usize::MAX, 0);
+
+    let coords = get_merged_results(&x_coords, &y_coords);
+    for coord in &coords {
+        x_range.0 = x_range.0.min(coord.0);
+        x_range.1 = x_range.1.max(coord.0);
+
+        y_range.0 = y_range.0.min(coord.1);
+        y_range.1 = y_range.1.max(coord.1);
+    }
+
+    for y in y_range.0..=y_range.1 {
+        for x in x_range.0..=x_range.1 {
+            if coords.contains(&(x, y)) {
+                print!("#");
+            } else {
+                print!(".");
+            }
+        }
+        print!("\n");
     }
 
     Ok(())
@@ -144,26 +185,7 @@ mod test {
 
         flip_on_axis(&mut y_coords, &mut x_coords, 2);
 
-        let mut x_result = HashMap::new();
-        // 0,0  0,2
-        x_result.insert(0, HashMap::from([(0, 1), (2, 1)]));
-        // 2,0  2,1
-        x_result.insert(2, HashMap::from([(0, 2), (1, 1)]));
-        // 3,0  3,1
-        x_result.insert(3, HashMap::from([(0, 1), (1, 1)]));
-        // 4,0
-        x_result.insert(4, HashMap::from([(0, 1)]));
-        assert_eq!(x_coords, x_result);
-
-        let mut y_result = HashMap::new();
-        // 0,0, 2,0  3,0  4,0
-        y_result.insert(0, HashMap::from([(0, 1), (2, 2), (3, 1), (4, 1)]));
-        // 2,1  3,1
-        y_result.insert(1, HashMap::from([(2, 1), (3, 1)]));
-        // 2,0
-        y_result.insert(2, HashMap::from([(0, 1)]));
-        assert_eq!(y_coords, y_result);
-
-        assert_eq!(x_coords.len(), y_coords.len());
+        let expected = HashSet::from([(0, 0), (0, 2), (2, 0), (2, 1), (3, 0), (3, 1), (4, 0)]);
+        assert_eq!(get_merged_results(&x_coords, &y_coords), expected);
     }
 }
