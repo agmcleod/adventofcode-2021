@@ -33,7 +33,7 @@ fn main() -> Result<()> {
     }
 
     // or 10 for part 1
-    for _ in 0..40 {
+    for _ in 0..10 {
         let mut next_iteration = template.clone();
         let mut insert_count = 0;
         for i in 0..template.len() {
@@ -56,15 +56,6 @@ fn main() -> Result<()> {
             }
         }
 
-        // println!(
-        //     "{}",
-        //     next_iteration
-        //         .iter()
-        //         .map(|v| v.clone())
-        //         .collect::<Vec<String>>()
-        //         .join("")
-        // );
-
         template = next_iteration;
     }
 
@@ -77,20 +68,15 @@ fn main() -> Result<()> {
         }
     }
 
-    let mut min = ("".to_string(), std::i32::MAX);
-    let mut max = ("".to_string(), 0);
+    let mut min = std::i32::MAX;
+    let mut max = std::i32::MIN;
 
-    for (el, count) in &count {
-        if *count < min.1 {
-            min.0 = el.clone();
-            min.1 = *count;
-        } else if *count > max.1 {
-            max.0 = el.clone();
-            max.1 = *count;
-        }
+    for (_el, count) in &count {
+        min = min.min(*count);
+        max = max.max(*count);
     }
 
-    println!("{}", max.1 - min.1);
+    println!("{}", max - min);
 
     Ok(())
 }
