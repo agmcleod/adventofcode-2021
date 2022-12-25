@@ -32,18 +32,18 @@ impl Ord for Location {
     }
 }
 
-// fn distance_to_target(location: &Position, target: &Position) -> i32 {
-//     let mut x_diff = location.1 - target.1;
-//     let mut y_diff = location.0 - target.0;
-//     if x_diff < 0 {
-//         x_diff *= -1;
-//     }
-//     if y_diff < 0 {
-//         y_diff *= -1;
-//     }
+fn distance_to_target(location: &Position, target: &Position) -> i32 {
+    let mut x_diff = location.1 - target.1;
+    let mut y_diff = location.0 - target.0;
+    if x_diff < 0 {
+        x_diff *= -1;
+    }
+    if y_diff < 0 {
+        y_diff *= -1;
+    }
 
-//     x_diff + y_diff
-// }
+    x_diff + y_diff
+}
 
 fn get_adjacents(grid: &Grid, pos: &Position) -> Vec<Position> {
     let mut adjancents = Vec::new();
@@ -68,13 +68,22 @@ fn main() -> Result<()> {
 
     let mut grid = Vec::with_capacity(text.lines().count());
 
+    let mut target = (0, 0);
+    let mut x = 0;
+    let mut y = 0;
     for line in text.lines() {
         let mut row = Vec::with_capacity(line.chars().count());
+        y += 1;
+        x = 0;
         for ch in line.chars() {
             row.push(ch.to_digit(10).unwrap() as i32);
+            x += 1;
         }
         grid.push(row);
     }
+
+    target.0 = x - 1;
+    target.1 = y - 1;
 
     let mut heap: BinaryHeap<Location> = BinaryHeap::new();
     heap.push(Location {
@@ -88,7 +97,8 @@ fn main() -> Result<()> {
     let mut tracked_positions = Vec::new();
 
     while let Some(location) = heap.pop() {
-        if location.pos == (9, 9) {
+        println!("{:?}", location.pos);
+        if location.pos == target {
             let mut pos: &(i32, i32) = closed.get(&location.pos).unwrap();
             tracked_positions.push(location.pos);
             loop {
@@ -103,11 +113,13 @@ fn main() -> Result<()> {
         }
         let adjacents = get_adjacents(&grid, &location.pos);
         for pos in &adjacents {
+            // get cost of next by taking current + risk level of next
             let new_cost = costs.get(&location.pos).unwrap() + grid[pos.1 as usize][pos.0 as usize];
             if !costs.contains_key(pos) || new_cost < *costs.get(pos).unwrap() {
                 heap.push(Location {
                     pos: pos.to_owned(),
-                    score: new_cost, // + distance_to_target(pos, &location.pos),
+                    // score is sorted by cost & distance
+                    score: new_cost + distance_to_target(pos, &location.pos),
                 });
                 closed.insert(pos.to_owned(), location.pos);
                 costs.insert(pos.to_owned(), new_cost);
