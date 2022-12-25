@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::io::Result;
 
 use read_input::read_text;
@@ -9,30 +9,41 @@ type Grid = Vec<Vec<i32>>;
 type Position = (i32, i32);
 
 #[derive(Eq)]
-struct Step {
+struct Location {
     pos: Position,
     score: i32,
-    path: Vec<Position>,
-    crossed_points: HashSet<Position>,
 }
 
-impl PartialEq for Step {
+impl PartialEq for Location {
     fn eq(&self, other: &Self) -> bool {
         self.score == other.score
     }
 }
 
-impl PartialOrd for Step {
+impl PartialOrd for Location {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for Step {
-    fn cmp(&self, other: &Step) -> Ordering {
-        self.score.cmp(&other.score)
+impl Ord for Location {
+    fn cmp(&self, other: &Location) -> Ordering {
+        other.score.cmp(&self.score)
     }
 }
+
+// fn distance_to_target(location: &Position, target: &Position) -> i32 {
+//     let mut x_diff = location.1 - target.1;
+//     let mut y_diff = location.0 - target.0;
+//     if x_diff < 0 {
+//         x_diff *= -1;
+//     }
+//     if y_diff < 0 {
+//         y_diff *= -1;
+//     }
+
+//     x_diff + y_diff
+// }
 
 fn get_adjacents(grid: &Grid, pos: &Position) -> Vec<Position> {
     let mut adjancents = Vec::new();
@@ -65,44 +76,52 @@ fn main() -> Result<()> {
         grid.push(row);
     }
 
-    let mut work: BinaryHeap<Step> = BinaryHeap::new();
-    let mut crossed_points = HashSet::new();
-    crossed_points.insert((0, 0));
-    work.push(Step {
+    let mut heap: BinaryHeap<Location> = BinaryHeap::new();
+    heap.push(Location {
         pos: (0, 0),
         score: 0,
-        path: Vec::new(),
-        crossed_points,
     });
+    let mut costs = HashMap::new();
+    costs.insert((0, 0), 0);
+    let mut closed = HashMap::new();
 
-    while let Some(next_step) = work.pop() {
-        if next_step.pos == (9, 9) {
-            println!(
-                "{}",
-                next_step
-                    .path
-                    .iter()
-                    .fold(0, |sum, pos| { sum + grid[pos.1 as usize][pos.0 as usize] })
-            );
+    let mut tracked_positions = Vec::new();
+
+    while let Some(location) = heap.pop() {
+        if location.pos == (9, 9) {
+            let mut pos: &(i32, i32) = closed.get(&location.pos).unwrap();
+            tracked_positions.push(location.pos);
+            loop {
+                if let Some(p) = closed.get(pos) {
+                    tracked_positions.push(p.to_owned());
+                    pos = p;
+                } else {
+                    break;
+                }
+            }
             break;
         }
-        let adjacents = get_adjacents(&grid, &next_step.pos);
+        let adjacents = get_adjacents(&grid, &location.pos);
         for pos in &adjacents {
-            if next_step.crossed_points.contains(pos) {
-                continue;
+            let new_cost = costs.get(&location.pos).unwrap() + grid[pos.1 as usize][pos.0 as usize];
+            if !costs.contains_key(pos) || new_cost < *costs.get(pos).unwrap() {
+                heap.push(Location {
+                    pos: pos.to_owned(),
+                    score: new_cost, // + distance_to_target(pos, &location.pos),
+                });
+                closed.insert(pos.to_owned(), location.pos);
+                costs.insert(pos.to_owned(), new_cost);
             }
-            let mut path = next_step.path.clone();
-            path.push(pos.to_owned());
-            let mut crossed_points = next_step.crossed_points.clone();
-            crossed_points.insert(pos.to_owned());
-            work.push(Step {
-                pos: pos.to_owned(),
-                score: grid[pos.1 as usize][pos.0 as usize],
-                path,
-                crossed_points,
-            });
         }
     }
+
+    tracked_positions.reverse();
+    println!(
+        "{:?}",
+        tracked_positions
+            .iter()
+            .fold(0, |sum, pos| sum + grid[pos.1 as usize][pos.0 as usize])
+    );
 
     Ok(())
 }
