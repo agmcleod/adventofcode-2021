@@ -50,7 +50,7 @@ fn get_adjacents(grid: &Grid, pos: &Position) -> Vec<Position> {
     if pos.0 - 1 >= 0 {
         adjancents.push((pos.0 - 1, pos.1));
     }
-    if pos.0 + 1 < grid.len() as i32 {
+    if pos.0 + 1 < grid[0].len() as i32 {
         adjancents.push((pos.0 + 1, pos.1));
     }
     if pos.1 - 1 >= 0 {
@@ -92,15 +92,14 @@ fn main() -> Result<()> {
     });
     let mut costs = HashMap::new();
     costs.insert((0, 0), 0);
-    let mut closed = HashMap::new();
+    let mut closed: HashMap<Position, Position> = HashMap::new();
 
     let mut tracked_positions = Vec::new();
 
     while let Some(location) = heap.pop() {
-        println!("{:?}", location.pos);
         if location.pos == target {
-            let mut pos: &(i32, i32) = closed.get(&location.pos).unwrap();
-            tracked_positions.push(location.pos);
+            let mut pos: &(i32, i32) = &location.pos;
+            tracked_positions.push(pos.to_owned());
             loop {
                 if let Some(p) = closed.get(pos) {
                     tracked_positions.push(p.to_owned());
@@ -119,7 +118,7 @@ fn main() -> Result<()> {
                 heap.push(Location {
                     pos: pos.to_owned(),
                     // score is sorted by cost & distance
-                    score: new_cost + distance_to_target(pos, &location.pos),
+                    score: new_cost + distance_to_target(&location.pos, pos),
                 });
                 closed.insert(pos.to_owned(), location.pos);
                 costs.insert(pos.to_owned(), new_cost);
@@ -128,11 +127,16 @@ fn main() -> Result<()> {
     }
 
     tracked_positions.reverse();
+
     println!(
-        "{:?}",
-        tracked_positions
-            .iter()
-            .fold(0, |sum, pos| sum + grid[pos.1 as usize][pos.0 as usize])
+        "{}",
+        tracked_positions.iter().fold(0, |sum, pos| {
+            if *pos == (0, 0) {
+                sum
+            } else {
+                sum + grid[pos.1 as usize][pos.0 as usize]
+            }
+        })
     );
 
     Ok(())
