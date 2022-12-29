@@ -63,28 +63,7 @@ fn get_adjacents(grid: &Grid, pos: &Position) -> Vec<Position> {
     adjancents
 }
 
-fn main() -> Result<()> {
-    let text = read_text("15/input.txt")?;
-
-    let mut grid = Vec::with_capacity(text.lines().count());
-
-    let mut target = (0, 0);
-    let mut x = 0;
-    let mut y = 0;
-    for line in text.lines() {
-        let mut row = Vec::with_capacity(line.chars().count());
-        y += 1;
-        x = 0;
-        for ch in line.chars() {
-            row.push(ch.to_digit(10).unwrap() as i32);
-            x += 1;
-        }
-        grid.push(row);
-    }
-
-    target.0 = x - 1;
-    target.1 = y - 1;
-
+fn find_path(grid: &Vec<Vec<i32>>, target: &Position) {
     let mut heap: BinaryHeap<Location> = BinaryHeap::new();
     heap.push(Location {
         pos: (0, 0),
@@ -97,7 +76,7 @@ fn main() -> Result<()> {
     let mut tracked_positions = Vec::new();
 
     while let Some(location) = heap.pop() {
-        if location.pos == target {
+        if location.pos == *target {
             let mut pos: &(i32, i32) = &location.pos;
             tracked_positions.push(pos.to_owned());
             loop {
@@ -138,6 +117,69 @@ fn main() -> Result<()> {
             }
         })
     );
+}
+
+fn main() -> Result<()> {
+    let text = read_text("15/input.txt")?;
+
+    let mut grid = Vec::with_capacity(text.lines().count());
+
+    let mut target = (0, 0);
+    let mut x = 0;
+    let mut y = 0;
+    for line in text.lines() {
+        let mut row = Vec::with_capacity(line.chars().count());
+        y += 1;
+        x = 0;
+        for ch in line.chars() {
+            row.push(ch.to_digit(10).unwrap() as i32);
+            x += 1;
+        }
+        grid.push(row);
+    }
+
+    target.0 = x - 1;
+    target.1 = y - 1;
+
+    find_path(&grid, &target);
+    let mut big_grid = grid.clone();
+
+    let original_size = (target.0 + 1, target.1 + 1);
+    for col_i in 0..5 {
+        for row_i in 0..5 {
+            // skip as our grid has this already
+            if col_i == 0 && row_i == 0 {
+                continue;
+            }
+
+            let row_target_size = (original_size.1 * (row_i + 1)) as usize;
+            if big_grid.len() < row_target_size {
+                for _ in 0..(row_target_size - big_grid.len()) {
+                    big_grid.push(Vec::new());
+                }
+            }
+
+            for (i, row) in grid.iter().enumerate() {
+                for col in row {
+                    let col = (*col + col_i + row_i) % 9;
+                    let n = if col == 0 { 9 } else { col };
+                    big_grid[(i as i32 + row_i * original_size.1) as usize].push(n);
+                }
+            }
+        }
+    }
+
+    target.0 = original_size.0 * 5 - 1;
+    target.1 = original_size.1 * 5 - 1;
+
+    // for row in &big_grid {
+    //     for col in row {
+    //         print!("{}", col);
+    //     }
+    //     println!();
+    // }
+
+    find_path(&big_grid, &target);
 
     Ok(())
 }
