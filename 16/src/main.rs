@@ -86,7 +86,8 @@ fn parse_packet(binary: &Vec<u8>) -> ParsedPacket {
     let type_id = get_number_from_range(binary, 3, 5);
     let mut parsed_packet = ParsedPacket::new(version);
 
-    println!("version: {}, type_id: {}", version, type_id);
+    // println!("version: {}, type_id: {}", version, type_id);
+    // println!("{:?}", binary);
 
     match type_id {
         // contains a single number broken into segments of 5
@@ -152,8 +153,8 @@ fn parse_packet(binary: &Vec<u8>) -> ParsedPacket {
                             break;
                         }
                     }
-
-                    parsed_packet.add_to_length(end);
+                    // add 1 here to move the cursor to the next digit, dont count the ending one twice
+                    parsed_packet.add_to_length(end + 1);
                 }
                 1 => {
                     // start at 7, after version, type id, and length
@@ -179,7 +180,8 @@ fn parse_packet(binary: &Vec<u8>) -> ParsedPacket {
 
                         parsed_packet.append(sub_parsed_packet);
                     }
-                    parsed_packet.add_to_length(end);
+                    // add 1 here to move the cursor to the next digit, dont count the ending one twice
+                    parsed_packet.add_to_length(end + 1);
                 }
                 _ => panic!("Invalid length type id {} for {:?}", length_type_id, binary),
             }
