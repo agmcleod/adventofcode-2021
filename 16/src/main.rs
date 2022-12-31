@@ -79,6 +79,70 @@ impl ParsedPacket {
     fn add_to_length(&mut self, amount: usize) {
         self.resulting_length = Some(self.resulting_length.unwrap() + amount);
     }
+
+    fn process_op_code(&mut self, code: usize) {
+        match code {
+            0 => {
+                self.literal_values =
+                    vec![self.literal_values.iter().fold(0, |sum, value| sum + value)];
+            }
+            1 => {
+                self.literal_values =
+                    vec![self.literal_values.iter().fold(1, |sum, value| sum * value)];
+            }
+            2 => {
+                let min = self.literal_values.iter().min().unwrap();
+                self.literal_values = vec![*min];
+            }
+            3 => {
+                let max = self.literal_values.iter().max().unwrap();
+                self.literal_values = vec![*max];
+            }
+            5 => {
+                if self.literal_values.len() != 2 {
+                    println!(
+                        "had more than two values in sub packet for greater than op {:?}",
+                        self.literal_values
+                    );
+                }
+                let value = if self.literal_values[0] > self.literal_values[1] {
+                    1
+                } else {
+                    0
+                };
+                self.literal_values = vec![value];
+            }
+            6 => {
+                if self.literal_values.len() != 2 {
+                    println!(
+                        "had more than two values in sub packet for less than op {:?}",
+                        self.literal_values
+                    );
+                }
+                let value = if self.literal_values[0] < self.literal_values[1] {
+                    1
+                } else {
+                    0
+                };
+                self.literal_values = vec![value];
+            }
+            7 => {
+                if self.literal_values.len() != 2 {
+                    println!(
+                        "had more than two values in sub packet for equal to op {:?}",
+                        self.literal_values
+                    );
+                }
+                let value = if self.literal_values[0] == self.literal_values[1] {
+                    1
+                } else {
+                    0
+                };
+                self.literal_values = vec![value];
+            }
+            _ => panic!("Unrecognized op code: {}", code),
+        }
+    }
 }
 
 fn parse_packet(binary: &Vec<u8>) -> ParsedPacket {
@@ -185,6 +249,7 @@ fn parse_packet(binary: &Vec<u8>) -> ParsedPacket {
                 }
                 _ => panic!("Invalid length type id {} for {:?}", length_type_id, binary),
             }
+            parsed_packet.process_op_code(type_id);
         }
     }
 
