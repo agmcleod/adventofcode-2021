@@ -47,7 +47,6 @@ fn try_launch_velocity(
         highest_y_point = highest_y_point.max(position.1);
 
         if target_area_contains_pos(&target_area, &position) {
-            println!("Hit the target area");
             result = TrajectoryResult::HitTarget;
             break;
         }
@@ -97,17 +96,18 @@ fn try_launch_velocity(
 }
 
 fn main() {
-    let target_area = (20, -5, 30, -10);
-    // let target_area = (248, -56, 285, -85);
+    // let target_area = (20, -10, 30, -5);
+    let target_area = (248, -85, 285, -56);
 
     let mut velocity = (2, 2);
     let mut highest_y_reached = None;
-    let mut increase_rate_x = 3;
-    let mut increase_rate_y = 3;
+    let mut increase_rate_x = 10;
+    let mut increase_rate_y = 10;
+
+    let mut result;
 
     loop {
-        let result = try_launch_velocity(&target_area, velocity.clone());
-        println!("{:?} {:?}", result, velocity);
+        result = try_launch_velocity(&target_area, velocity.clone());
 
         match result.0 {
             TrajectoryResult::HitTarget => {
@@ -124,33 +124,33 @@ fn main() {
                 velocity.0 += increase_rate_x;
             }
             TrajectoryResult::PassedTarget => {
-                if highest_y_reached.is_some() {
-                    break;
-                }
+                // if highest_y_reached.is_some() {
+                //     break;
+                // }
                 halve_velocity(&mut increase_rate_x);
                 velocity.0 -= increase_rate_x;
             }
             TrajectoryResult::FallingShortOfTarget => {
                 velocity.0 += increase_rate_x;
-                velocity.1 += increase_rate_y;
+                // velocity.1 += increase_rate_y;
             }
             TrajectoryResult::FallingPassedTarget => {
-                if highest_y_reached.is_some() {
-                    break;
-                }
+                // if highest_y_reached.is_some() {
+                //     break;
+                // }
                 // reduce x rate as it means that we're falling after passing the area, so we can reduce x velocity to try to land closer to the area.
                 halve_velocity(&mut increase_rate_x);
                 velocity.0 -= increase_rate_x;
             }
             TrajectoryResult::FellOverTarget => {
-                if highest_y_reached.is_some() {
-                    break;
-                }
+                // if highest_y_reached.is_some() {
+                //     break;
+                // }
                 halve_velocity(&mut increase_rate_y);
                 velocity.1 -= increase_rate_y;
             }
         }
     }
 
-    println!("{:?}", velocity);
+    println!("{}", highest_y_reached.unwrap());
 }
