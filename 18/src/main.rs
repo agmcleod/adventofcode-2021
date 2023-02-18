@@ -1,3 +1,4 @@
+use std::fmt;
 use std::io::Result;
 use std::str::Chars;
 
@@ -10,8 +11,22 @@ enum Pair {
     Value(u32),
 }
 
+impl fmt::Display for Pair {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Pair::None => {
+                write!(f, "")
+            }
+            Pair::Pair(pair) => {
+                write!(f, "[{},{}]", pair.0, pair.1)
+            }
+            Pair::Value(n) => write!(f, "{}", n),
+        }
+    }
+}
+
 fn create_pair_structure(iter: &mut Chars) -> Pair {
-    let pair: Pair = Pair::Pair(Box::new((Pair::None, Pair::None)));
+    let mut pair: Pair = Pair::Pair(Box::new((Pair::None, Pair::None)));
 
     loop {
         let ch = iter.next();
@@ -25,8 +40,8 @@ fn create_pair_structure(iter: &mut Chars) -> Pair {
                 Pair::None => {
                     panic!("Returned None after a left bracket.");
                 }
-                Pair::Pair(returned_pair) => match pair {
-                    Pair::Pair(mut pair) => {
+                Pair::Pair(returned_pair) => match &mut pair {
+                    Pair::Pair(pair) => {
                         if pair.0 == Pair::None {
                             pair.0 = Pair::Pair(returned_pair);
                         } else if pair.1 == Pair::None {
@@ -54,8 +69,8 @@ fn create_pair_structure(iter: &mut Chars) -> Pair {
                 }
 
                 // with a digit parsed, we need to add it to this level's pair
-                match pair {
-                    Pair::Pair(mut pair) => {
+                match &mut pair {
+                    Pair::Pair(pair) => {
                         if pair.0 == Pair::None {
                             pair.0 = Pair::Value(digit.unwrap());
                         } else if pair.1 == Pair::None {
@@ -79,7 +94,11 @@ fn create_pair_structure(iter: &mut Chars) -> Pair {
 fn main() -> Result<()> {
     let text = read_text("18/input.txt")?;
 
-    for line in text.lines() {}
+    for line in text.lines() {
+        let mut iter = line.chars();
+        let pair = create_pair_structure(&mut iter);
+        println!("{}", pair);
+    }
 
     Ok(())
 }
