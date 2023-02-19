@@ -4,11 +4,40 @@ use std::str::Chars;
 
 use read_input::read_text;
 
-#[derive(PartialEq)]
 enum Pair {
     None,
-    Pair(Box<(Pair, Pair)>),
+    Pair(Box<(PairNode, PairNode)>),
     Value(u32),
+}
+
+impl Pair {
+    fn is_none(&self) -> bool {
+        match *self {
+            Pair::None => true,
+            _ => false,
+        }
+    }
+}
+
+enum TreeSide {
+    Left,
+    Right,
+}
+
+struct PairNode {
+    parent: Box<Pair>,
+    side_of_parent: TreeSide,
+    pair: Box<Pair>,
+}
+
+impl PairNode {
+    fn new(parent: Box<Pair>, side_of_parent: TreeSide) -> Self {
+        PairNode {
+            parent,
+            side_of_parent,
+            pair: Box::new(Pair::None),
+        }
+    }
 }
 
 impl fmt::Display for Pair {
@@ -18,7 +47,7 @@ impl fmt::Display for Pair {
                 write!(f, "")
             }
             Pair::Pair(pair) => {
-                write!(f, "[{},{}]", pair.0, pair.1)
+                write!(f, "[{},{}]", pair.0.pair, pair.1.pair)
             }
             Pair::Value(n) => write!(f, "{}", n),
         }
@@ -35,16 +64,22 @@ fn create_pair_structure(iter: &mut Chars, mut pair: Pair) -> Pair {
         let ch = ch.unwrap();
         match ch {
             '[' => {
-                match create_pair_structure(iter, Pair::Pair(Box::new((Pair::None, Pair::None)))) {
+                match create_pair_structure(
+                    iter,
+                    Pair::Pair(Box::new((
+                        PairNode::new(Box::new(pair), TreeSide::Left),
+                        PairNode::new(Box::new(pair), TreeSide::Right),
+                    ))),
+                ) {
                     Pair::None => {
                         panic!("Returned None after a left bracket.");
                     }
                     Pair::Pair(returned_pair) => match &mut pair {
                         Pair::Pair(pair) => {
-                            if pair.0 == Pair::None {
-                                pair.0 = Pair::Pair(returned_pair);
-                            } else if pair.1 == Pair::None {
-                                pair.1 = Pair::Pair(returned_pair);
+                            if pair.0.pair.is_none() {
+                                pair.0.pair = Box::new(Pair::Pair(returned_pair));
+                            } else if pair.1.pair.is_none() {
+                                pair.1.pair = Box::new(Pair::Pair(returned_pair));
                             } else {
                                 panic!(
                                 "Pair already populated for trying to populate returned pair from sub level"
