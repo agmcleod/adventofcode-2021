@@ -3,6 +3,7 @@ use std::io::Result;
 use std::str::Chars;
 
 use read_input::read_text;
+use uuid::Uuid;
 
 enum Pair {
     None,
@@ -15,27 +16,6 @@ impl Pair {
         match *self {
             Pair::None => true,
             _ => false,
-        }
-    }
-}
-
-enum TreeSide {
-    Left,
-    Right,
-}
-
-struct PairNode {
-    parent: Box<Pair>,
-    side_of_parent: TreeSide,
-    pair: Box<Pair>,
-}
-
-impl PairNode {
-    fn new(parent: Box<Pair>, side_of_parent: TreeSide) -> Self {
-        PairNode {
-            parent,
-            side_of_parent,
-            pair: Box::new(Pair::None),
         }
     }
 }
@@ -54,6 +34,39 @@ impl fmt::Display for Pair {
     }
 }
 
+enum TreeSide {
+    Left,
+    Right,
+}
+
+struct PairNode {
+    id: String,
+    parent: Box<Pair>,
+    side_of_parent: TreeSide,
+    pair: Box<Pair>,
+}
+
+impl PairNode {
+    fn new(parent: Box<Pair>, side_of_parent: TreeSide) -> Self {
+        PairNode {
+            id: Uuid::new_v4().to_string(),
+            parent,
+            side_of_parent,
+            pair: Box::new(Pair::None),
+        }
+    }
+
+    fn is_none(&self) -> bool {
+        self.pair.is_none()
+    }
+}
+
+impl PartialEq for PairNode {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
 fn create_pair_structure(iter: &mut Chars, mut pair: Pair) -> Pair {
     loop {
         let ch = iter.next();
@@ -66,6 +79,7 @@ fn create_pair_structure(iter: &mut Chars, mut pair: Pair) -> Pair {
             '[' => {
                 match create_pair_structure(
                     iter,
+                    // create a new pair to pass down to be updated by the recursive call
                     Pair::Pair(Box::new((
                         PairNode::new(Box::new(pair), TreeSide::Left),
                         PairNode::new(Box::new(pair), TreeSide::Right),
@@ -76,9 +90,9 @@ fn create_pair_structure(iter: &mut Chars, mut pair: Pair) -> Pair {
                     }
                     Pair::Pair(returned_pair) => match &mut pair {
                         Pair::Pair(pair) => {
-                            if pair.0.pair.is_none() {
+                            if pair.0.is_none() {
                                 pair.0.pair = Box::new(Pair::Pair(returned_pair));
-                            } else if pair.1.pair.is_none() {
+                            } else if pair.1.is_none() {
                                 pair.1.pair = Box::new(Pair::Pair(returned_pair));
                             } else {
                                 panic!(
@@ -109,10 +123,10 @@ fn create_pair_structure(iter: &mut Chars, mut pair: Pair) -> Pair {
                 // with a digit parsed, we need to add it to this level's pair
                 match &mut pair {
                     Pair::Pair(pair) => {
-                        if pair.0 == Pair::None {
-                            pair.0 = Pair::Value(digit.unwrap());
-                        } else if pair.1 == Pair::None {
-                            pair.1 = Pair::Value(digit.unwrap());
+                        if pair.0.is_none() {
+                            pair.0.pair = Box::new(Pair::Value(digit.unwrap()));
+                        } else if pair.1.is_none() {
+                            pair.1.pair = Box::new(Pair::Value(digit.unwrap()));
                         } else {
                             panic!(
                                 "Pair already populated for trying to populate number {}",
@@ -138,10 +152,17 @@ fn reduce_pair(pair: &mut Pair, depth: u32) {
             let next_depth = depth + 1;
 
             // instead of nesting let's expload the pair
-            if next_depth == 5 {}
-
-            reduce_pair(&mut pair.0, next_depth);
-            reduce_pair(&mut pair.1, next_depth);
+            if next_depth == 5 {
+                // get left of pair
+                let mut going_up = true;
+                let mut parent = pair.0.parent;
+                loop {
+                    if going_up {}
+                }
+            } else {
+                reduce_pair(&mut pair.0.pair, next_depth);
+                reduce_pair(&mut pair.1.pair, next_depth);
+            }
         }
         _ => {}
     }
@@ -153,7 +174,7 @@ fn main() -> Result<()> {
     for line in text.lines() {
         let mut iter = line.chars();
         let mut pair = create_pair_structure(&mut iter, Pair::None);
-        println!("{}", pair);
+        // println!("{}", pair);
         reduce_pair(&mut pair, 1);
     }
 
