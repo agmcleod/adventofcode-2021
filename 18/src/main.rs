@@ -29,12 +29,7 @@ impl fmt::Display for Pair {
                 write!(f, "")
             }
             Pair::PairNode(pair) => {
-                write!(
-                    f,
-                    "[{},{}]",
-                    pair.children.0.as_ref().borrow(),
-                    pair.children.1.as_ref().borrow()
-                )
+                write!(f, "{}", pair)
             }
             Pair::Value(n) => write!(f, "{}", n),
         }
@@ -66,7 +61,20 @@ impl PartialEq for PairNode {
     }
 }
 
-fn create_pair_structure(iter: &mut Chars, mut pair_node: PairNode) -> Pair {
+impl fmt::Display for PairNode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "[{},{}]",
+            self.children.0.as_ref().borrow(),
+            self.children.1.as_ref().borrow()
+        )
+    }
+}
+
+fn create_pair_structure(iter: &mut Chars, pair_node: PairNode) -> PairNode {
+    let pair = Rc::downgrade(&Rc::new(RefCell::new(pair_node)));
+
     loop {
         let ch = iter.next();
         if ch.is_none() {
@@ -76,34 +84,24 @@ fn create_pair_structure(iter: &mut Chars, mut pair_node: PairNode) -> Pair {
         let ch = ch.unwrap();
         match ch {
             '[' => {
-                let pair = Rc::downgrade(&Rc::new(RefCell::new(pair_node)));
-                match create_pair_structure(
+                let returned_pair = create_pair_structure(
                     iter,
                     // create a new pair to pass down to be updated by the recursive call
                     PairNode::new(Some(pair.clone())),
-                ) {
-                    Pair::None => {
-                        panic!("Returned None after a left bracket.");
-                    }
-                    Pair::PairNode(returned_pair) => {
-                        let pair = pair.upgrade().unwrap();
-                        let mut pair = pair.borrow_mut();
-                        if pair.children.0.as_ref().borrow().is_none() {
-                            pair.children.0 = Rc::new(RefCell::new(Pair::PairNode(returned_pair)));
-                        } else if pair.children.1.as_ref().borrow().is_none() {
-                            pair.children.1 = Rc::new(RefCell::new(Pair::PairNode(returned_pair)));
-                        } else {
-                            panic!(
-                                "Pair already populated for trying to populate returned pair from sub level"
-                            );
-                        }
-                    }
-                    Pair::Value(_value) => {
-                        panic!("Should not have returned single value");
-                    }
+                );
+                let pair = pair.upgrade().unwrap();
+                let mut pair = pair.borrow_mut();
+                if pair.children.0.as_ref().borrow().is_none() {
+                    pair.children.0 = Rc::new(RefCell::new(Pair::PairNode(returned_pair)));
+                } else if pair.children.1.as_ref().borrow().is_none() {
+                    pair.children.1 = Rc::new(RefCell::new(Pair::PairNode(returned_pair)));
+                } else {
+                    panic!(
+                        "Pair already populated for trying to populate returned pair from sub level"
+                    );
                 }
             }
-            ']' => return Pair::PairNode(pair_node),
+            ']' => break,
             ',' => {
                 // no op, we just continue with the pair
             }
@@ -113,10 +111,12 @@ fn create_pair_structure(iter: &mut Chars, mut pair_node: PairNode) -> Pair {
                     panic!("Invalid number: {}", ch);
                 }
 
-                if pair_node.children.0.as_ref().borrow().is_none() {
-                    pair_node.children.0 = Rc::new(RefCell::new(Pair::Value(digit.unwrap())));
-                } else if pair_node.children.1.as_ref().borrow().is_none() {
-                    pair_node.children.1 = Rc::new(RefCell::new(Pair::Value(digit.unwrap())));
+                let pair = pair.upgrade().unwrap();
+                let mut pair = pair.borrow_mut();
+                if pair.children.0.as_ref().borrow().is_none() {
+                    pair.children.0 = Rc::new(RefCell::new(Pair::Value(digit.unwrap())));
+                } else if pair.children.1.as_ref().borrow().is_none() {
+                    pair.children.1 = Rc::new(RefCell::new(Pair::Value(digit.unwrap())));
                 } else {
                     panic!(
                         "Pair already populated for trying to populate number {}",
@@ -127,7 +127,9 @@ fn create_pair_structure(iter: &mut Chars, mut pair_node: PairNode) -> Pair {
         }
     }
 
-    Pair::PairNode(pair_node)
+    let pair = pair.upgrade().unwrap();
+    // let pair = pair.borrow();
+    pair.into_inner()
 }
 
 // fn reduce_pair(pair: &mut Pair, depth: u32) {
