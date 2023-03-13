@@ -72,7 +72,7 @@ impl fmt::Display for PairNode {
     }
 }
 
-fn create_pair_structure(iter: &mut Chars, pair_node: PairNode) -> PairNode {
+fn create_pair_structure(iter: &mut Chars, pair_node: PairNode) -> Rc<RefCell<PairNode>> {
     let pair = Rc::downgrade(&Rc::new(RefCell::new(pair_node)));
 
     loop {
@@ -92,9 +92,11 @@ fn create_pair_structure(iter: &mut Chars, pair_node: PairNode) -> PairNode {
                 let pair = pair.upgrade().unwrap();
                 let mut pair = pair.borrow_mut();
                 if pair.children.0.as_ref().borrow().is_none() {
-                    pair.children.0 = Rc::new(RefCell::new(Pair::PairNode(returned_pair)));
+                    pair.children.0 =
+                        Rc::new(RefCell::new(Pair::PairNode(returned_pair.into_inner())));
                 } else if pair.children.1.as_ref().borrow().is_none() {
-                    pair.children.1 = Rc::new(RefCell::new(Pair::PairNode(returned_pair)));
+                    pair.children.1 =
+                        Rc::new(RefCell::new(Pair::PairNode(returned_pair.into_inner())));
                 } else {
                     panic!(
                         "Pair already populated for trying to populate returned pair from sub level"
@@ -127,9 +129,7 @@ fn create_pair_structure(iter: &mut Chars, pair_node: PairNode) -> PairNode {
         }
     }
 
-    let pair = pair.upgrade().unwrap();
-    // let pair = pair.borrow();
-    pair.into_inner()
+    pair.upgrade().unwrap()
 }
 
 // fn reduce_pair(pair: &mut Pair, depth: u32) {
@@ -163,7 +163,7 @@ fn main() -> Result<()> {
     for line in text.lines() {
         let mut iter = line.chars();
         let mut pair = create_pair_structure(&mut iter, PairNode::new(None));
-        println!("{}", pair);
+        println!("{}", pair.into_inner());
         // reduce_pair(&mut pair, 1);
     }
 
