@@ -7,39 +7,12 @@ use std::str::Chars;
 use read_input::read_text;
 use uuid::Uuid;
 
-enum Pair {
-    None,
-    PairNode(PairNode),
-    Value(u32),
-}
-
-impl Pair {
-    fn is_none(&self) -> bool {
-        match *self {
-            Pair::None => true,
-            _ => false,
-        }
-    }
-}
-
-impl fmt::Display for Pair {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Pair::None => {
-                write!(f, "")
-            }
-            Pair::PairNode(pair) => {
-                write!(f, "{}", pair)
-            }
-            Pair::Value(n) => write!(f, "{}", n),
-        }
-    }
-}
-
 struct PairNode {
     id: String,
     parent: Option<Weak<RefCell<PairNode>>>,
-    children: (Rc<RefCell<Pair>>, Rc<RefCell<Pair>>),
+    left: Option<Rc<RefCell<PairNode>>>,
+    right: Option<Rc<RefCell<PairNode>>>,
+    value: Option<u32>,
 }
 
 impl PairNode {
@@ -47,10 +20,9 @@ impl PairNode {
         PairNode {
             id: Uuid::new_v4().to_string(),
             parent,
-            children: (
-                Rc::new(RefCell::new(Pair::None)),
-                Rc::new(RefCell::new(Pair::None)),
-            ),
+            left: None,
+            right: None,
+            value: None,
         }
     }
 }
@@ -63,17 +35,27 @@ impl PartialEq for PairNode {
 
 impl fmt::Display for PairNode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "[{},{}]",
-            self.children.0.as_ref().borrow(),
-            self.children.1.as_ref().borrow()
-        )
+        if self.value.is_some() {
+            write!(f, "{}", self.value.unwrap())
+        } else {
+            if self.left.is_some() && self.right.is_some() {
+                write!(
+                    f,
+                    "[{},{}]",
+                    self.left.as_ref().unwrap().borrow(),
+                    self.right.as_ref().unwrap().borrow()
+                )
+            } else if self.left.is_some() {
+                write!(f, "[{},]", self.left.as_ref().unwrap().borrow())
+            } else {
+                write!(f, "[,{}]", self.right.as_ref().unwrap().borrow())
+            }
+        }
     }
 }
 
-fn create_pair_structure(iter: &mut Chars, pair_node: PairNode) -> Rc<RefCell<PairNode>> {
-    let pair = Rc::downgrade(&Rc::new(RefCell::new(pair_node)));
+fn create_pair_structure(iter: &mut Chars, parent_pair_node: PairNode) -> Rc<RefCell<PairNode>> {
+    let parent = Rc::downgrade(&Rc::new(RefCell::new(parent_pair_node)));
 
     loop {
         let ch = iter.next();
@@ -87,16 +69,14 @@ fn create_pair_structure(iter: &mut Chars, pair_node: PairNode) -> Rc<RefCell<Pa
                 let returned_pair = create_pair_structure(
                     iter,
                     // create a new pair to pass down to be updated by the recursive call
-                    PairNode::new(Some(pair.clone())),
+                    PairNode::new(Some(parent.clone())),
                 );
-                let pair = pair.upgrade().unwrap();
-                let mut pair = pair.borrow_mut();
-                if pair.children.0.as_ref().borrow().is_none() {
-                    pair.children.0 =
-                        Rc::new(RefCell::new(Pair::PairNode(returned_pair.into_inner())));
-                } else if pair.children.1.as_ref().borrow().is_none() {
-                    pair.children.1 =
-                        Rc::new(RefCell::new(Pair::PairNode(returned_pair.into_inner())));
+                let parent = parent.upgrade().unwrap();
+                let mut parent = parent.borrow_mut();
+                if parent.left.is_none() {
+                    parent.left = Some(returned_pair);
+                } else if parent.right.is_none() {
+                    parent.right = Some(returned_pair);
                 } else {
                     panic!(
                         "Pair already populated for trying to populate returned pair from sub level"
@@ -113,12 +93,16 @@ fn create_pair_structure(iter: &mut Chars, pair_node: PairNode) -> Rc<RefCell<Pa
                     panic!("Invalid number: {}", ch);
                 }
 
-                let pair = pair.upgrade().unwrap();
+                let pair = parent.upgrade().unwrap();
                 let mut pair = pair.borrow_mut();
-                if pair.children.0.as_ref().borrow().is_none() {
-                    pair.children.0 = Rc::new(RefCell::new(Pair::Value(digit.unwrap())));
-                } else if pair.children.1.as_ref().borrow().is_none() {
-                    pair.children.1 = Rc::new(RefCell::new(Pair::Value(digit.unwrap())));
+                if pair.left.is_none() {
+                    let mut child_node = PairNode::new(Some(parent));
+                    child_node.value = Some(digit.unwrap());
+                    pair.left = Some(Rc::new(RefCell::new(child_node)));
+                } else if pair.right.is_none() {
+                    let mut child_node = PairNode::new(Some(parent));
+                    child_node.value = Some(digit.unwrap());
+                    pair.right = Some(Rc::new(RefCell::new(child_node)));
                 } else {
                     panic!(
                         "Pair already populated for trying to populate number {}",
@@ -129,7 +113,7 @@ fn create_pair_structure(iter: &mut Chars, pair_node: PairNode) -> Rc<RefCell<Pa
         }
     }
 
-    pair.upgrade().unwrap()
+    parent.upgrade().unwrap()
 }
 
 // fn reduce_pair(pair: &mut Pair, depth: u32) {
