@@ -46,7 +46,12 @@ impl fmt::Display for PairNode {
                     self.right.as_ref().unwrap().borrow()
                 )
             } else if self.left.is_some() {
-                write!(f, "[{},]", self.left.as_ref().unwrap().borrow())
+                // we assume root node
+                if self.parent.is_none() {
+                    write!(f, "{}", self.left.as_ref().unwrap().borrow())
+                } else {
+                    write!(f, "[{},]", self.left.as_ref().unwrap().borrow())
+                }
             } else {
                 write!(f, "[,{}]", self.right.as_ref().unwrap().borrow())
             }
@@ -55,7 +60,8 @@ impl fmt::Display for PairNode {
 }
 
 fn create_pair_structure(iter: &mut Chars, parent_pair_node: PairNode) -> Rc<RefCell<PairNode>> {
-    let parent = Rc::downgrade(&Rc::new(RefCell::new(parent_pair_node)));
+    let parent = Rc::new(RefCell::new(parent_pair_node));
+    let parent_weak = Rc::downgrade(&parent);
 
     loop {
         let ch = iter.next();
@@ -69,9 +75,9 @@ fn create_pair_structure(iter: &mut Chars, parent_pair_node: PairNode) -> Rc<Ref
                 let returned_pair = create_pair_structure(
                     iter,
                     // create a new pair to pass down to be updated by the recursive call
-                    PairNode::new(Some(parent.clone())),
+                    PairNode::new(Some(parent_weak.clone())),
                 );
-                let parent = parent.upgrade().unwrap();
+                let parent = parent.clone();
                 let mut parent = parent.borrow_mut();
                 if parent.left.is_none() {
                     parent.left = Some(returned_pair);
@@ -93,14 +99,14 @@ fn create_pair_structure(iter: &mut Chars, parent_pair_node: PairNode) -> Rc<Ref
                     panic!("Invalid number: {}", ch);
                 }
 
-                let pair = parent.upgrade().unwrap();
+                let pair = parent.clone();
                 let mut pair = pair.borrow_mut();
                 if pair.left.is_none() {
-                    let mut child_node = PairNode::new(Some(parent));
+                    let mut child_node = PairNode::new(Some(parent_weak.clone()));
                     child_node.value = Some(digit.unwrap());
                     pair.left = Some(Rc::new(RefCell::new(child_node)));
                 } else if pair.right.is_none() {
-                    let mut child_node = PairNode::new(Some(parent));
+                    let mut child_node = PairNode::new(Some(parent_weak.clone()));
                     child_node.value = Some(digit.unwrap());
                     pair.right = Some(Rc::new(RefCell::new(child_node)));
                 } else {
@@ -113,42 +119,46 @@ fn create_pair_structure(iter: &mut Chars, parent_pair_node: PairNode) -> Rc<Ref
         }
     }
 
-    parent.upgrade().unwrap()
+    parent
 }
 
-// fn reduce_pair(pair: &mut Pair, depth: u32) {
-//     if depth > 5 {
-//         panic!("Unexpected depth level: {}", depth);
-//     }
-//     match pair {
-//         Pair::PairNode(pair) => {
-//             let next_depth = depth + 1;
+fn reduce_pair(pair: Rc<RefCell<PairNode>>, depth: u32) {
+    if depth > 5 {
+        panic!("Unexpected depth level: {}", depth);
+    }
 
-//             // instead of nesting let's expload the pair
-//             if next_depth == 5 {
-//                 // get left of pair
-//                 let mut going_up = true;
-//                 let mut parent = pair.parent.unwrap().as_ptr().as_ptr();
-//                 loop {
-//                     if going_up {}
-//                 }
-//             } else {
-//                 reduce_pair(&mut pair.0.pair, next_depth);
-//                 reduce_pair(&mut pair.1.pair, next_depth);
-//             }
-//         }
-//         _ => {}
-//     }
-// }
+    let next_depth = depth + 1;
+
+    // instead of nesting let's expload the pair
+    if next_depth == 5 {
+        // get left of pair
+        let mut going_up = true;
+        let pair = pair.clone();
+        let pair = pair.borrow_mut();
+        let parent = pair.parent.as_ref().unwrap();
+        let parent = parent.as_ptr();
+        loop {
+            if going_up {}
+        }
+    } else {
+        let pair = pair.clone();
+        let pair = pair.borrow_mut();
+        if pair.left.is_some() {
+            reduce_pair(pair.left.clone().unwrap(), next_depth);
+        }
+        if pair.right.is_some() {
+            reduce_pair(pair.right.clone().unwrap(), next_depth);
+        }
+    }
+}
 
 fn main() -> Result<()> {
     let text = read_text("18/input.txt")?;
 
     for line in text.lines() {
         let mut iter = line.chars();
-        let mut pair = create_pair_structure(&mut iter, PairNode::new(None));
-        println!("{}", pair.into_inner());
-        // reduce_pair(&mut pair, 1);
+        let pair = create_pair_structure(&mut iter, PairNode::new(None));
+        reduce_pair(pair, 1);
     }
 
     Ok(())
