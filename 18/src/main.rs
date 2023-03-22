@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::fmt;
 use std::io::Result;
@@ -136,9 +137,11 @@ fn reduce_pair(pair: Rc<RefCell<PairNode>>, depth: u32) {
         let pair = pair.clone();
         let pair = pair.borrow_mut();
         let parent = pair.parent.as_ref().unwrap();
-        let parent = parent.as_ptr();
+        let parent = parent.upgrade().unwrap();
         loop {
-            if going_up {}
+            if going_up {
+                if parent.borrow().left != pair {}
+            }
         }
     } else {
         let pair = pair.clone();
