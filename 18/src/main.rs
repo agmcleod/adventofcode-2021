@@ -29,14 +29,6 @@ fn explode(mut this_iteration: Vec<String>, pos: usize) -> Vec<String> {
     // add 1 since the position is that of the left bracket
     let left_digit: usize = this_iteration[pos + 1].parse().unwrap();
     let right_digit: usize = this_iteration[pos + 3].parse().unwrap();
-    // println!(
-    //     "explode {} {}, digits: {},{}",
-    //     pos,
-    //     this_iteration.join(""),
-    //     left_digit,
-    //     right_digit
-    // );
-    // going left
     for i in (0..pos).rev() {
         let ch = this_iteration.get(i).unwrap();
         if ch != "[" && ch != "]" && ch != "," {
@@ -62,21 +54,11 @@ fn explode(mut this_iteration: Vec<String>, pos: usize) -> Vec<String> {
 
     this_iteration.insert(pos, "0".to_string());
 
-    // println!("explode result {} {}", pos, this_iteration.join(""));
-
     this_iteration
 }
 
 fn split(mut this_iteration: Vec<String>, pos: usize, digits: &str, depth: usize) -> Vec<String> {
-    // println!(
-    //     "Split i: {}, num: {} {}",
-    //     pos,
-    //     digits,
-    //     this_iteration.join("")
-    // );
     this_iteration.remove(pos);
-
-    // println!("Removed digits {}", this_iteration.join(""));
 
     let number_to_split: usize = digits.parse().unwrap();
     let div_two = number_to_split / 2;
@@ -95,8 +77,6 @@ fn split(mut this_iteration: Vec<String>, pos: usize, digits: &str, depth: usize
     if depth == 4 {
         return explode(this_iteration, pos);
     }
-
-    // println!("Inserted after split {} {}", pos, this_iteration.join(""));
 
     this_iteration
 }
@@ -166,81 +146,118 @@ fn calculate_magnitude(sf_number: Pair) -> usize {
     }
 }
 
+fn explode_iterations(result: &mut Vec<String>) {
+    loop {
+        let mut this_iteration = result.clone();
+
+        let mut depth = 0;
+        let mut operation_occurred = false;
+        for (i, ch) in result.iter().enumerate() {
+            if ch == "[" {
+                depth += 1;
+                if depth == 5 {
+                    this_iteration = explode(this_iteration, i);
+                    operation_occurred = true;
+                    break;
+                }
+            } else if ch == "]" {
+                depth -= 1;
+            }
+        }
+
+        *result = this_iteration;
+
+        if !operation_occurred {
+            break;
+        }
+    }
+}
+
+fn split_iterations(result: &mut Vec<String>) {
+    loop {
+        let mut this_iteration = result.clone();
+        let mut operation_occurred = false;
+        let mut depth = 0;
+        for (i, ch) in result.iter().enumerate() {
+            if ch == "[" {
+                depth += 1;
+            } else if ch == "]" {
+                depth -= 1;
+            } else if ch != "," && ch.len() > 1 {
+                this_iteration = split(this_iteration, i, ch, depth);
+                operation_occurred = true;
+                break;
+            }
+        }
+
+        *result = this_iteration;
+
+        if !operation_occurred {
+            break;
+        }
+    }
+}
+
+fn combine_numbers(one: &mut Vec<String>, two: &mut Vec<String>) {
+    one.insert(0, "[".to_string());
+    one.push(",".to_string());
+    one.append(two);
+    one.push("]".to_string());
+}
+
 fn main() -> Result<()> {
     let text = read_text("18/input.txt")?;
 
     let mut added_result = Vec::<String>::new();
 
-    for (i, line) in text.lines().enumerate() {
+    for line in text.lines() {
         let mut characters = line.chars().map(|c| c.to_string()).collect::<Vec<String>>();
         if added_result.is_empty() {
             added_result.append(&mut characters);
             continue;
         } else {
-            added_result.insert(0, "[".to_string());
-            added_result.push(",".to_string());
-            added_result.append(&mut characters);
-            added_result.push("]".to_string());
+            combine_numbers(&mut added_result, &mut characters);
         }
 
-        // println!("line {} {}", i + 1, added_result.join(""));
-
-        loop {
-            let mut this_iteration = added_result.clone();
-
-            let mut depth = 0;
-            let mut operation_occurred = false;
-            for (i, ch) in added_result.iter().enumerate() {
-                if ch == "[" {
-                    depth += 1;
-                    if depth == 5 {
-                        this_iteration = explode(this_iteration, i);
-                        operation_occurred = true;
-                        break;
-                    }
-                } else if ch == "]" {
-                    depth -= 1;
-                }
-            }
-
-            added_result = this_iteration;
-
-            if !operation_occurred {
-                break;
-            }
-        }
-
-        loop {
-            let mut this_iteration = added_result.clone();
-            let mut operation_occurred = false;
-            let mut depth = 0;
-            for (i, ch) in added_result.iter().enumerate() {
-                if ch == "[" {
-                    depth += 1;
-                } else if ch == "]" {
-                    depth -= 1;
-                } else if ch != "," && ch.len() > 1 {
-                    this_iteration = split(this_iteration, i, ch, depth);
-                    operation_occurred = true;
-                    break;
-                }
-            }
-
-            added_result = this_iteration;
-
-            if !operation_occurred {
-                break;
-            }
-        }
-
-        // println!("{}", added_result.join(""));
+        explode_iterations(&mut added_result);
+        split_iterations(&mut added_result);
     }
 
-    // println!("{}", added_result.join(""));
     let mut iter = added_result.iter();
     let pair = create_recursive_pairs(&mut iter, Pair::None);
-    // println!("{}", pair);
     println!("{}", calculate_magnitude(pair));
+
+    // p2
+    let mut largest_magnitude = 0;
+    for (i, line) in text.lines().enumerate() {
+        for line2 in text.lines().skip(i + 1) {
+            let mut characters = line.chars().map(|c| c.to_string()).collect::<Vec<String>>();
+            let mut characters2 = line2
+                .chars()
+                .map(|c| c.to_string())
+                .collect::<Vec<String>>();
+
+            let mut flipped_characters = characters.clone();
+            let mut flipped_characters2 = characters2.clone();
+
+            combine_numbers(&mut characters, &mut characters2);
+            combine_numbers(&mut flipped_characters2, &mut flipped_characters);
+
+            explode_iterations(&mut characters);
+            split_iterations(&mut characters);
+            let mut iter = characters.iter();
+            let pair = create_recursive_pairs(&mut iter, Pair::None);
+            largest_magnitude = largest_magnitude.max(calculate_magnitude(pair));
+
+            explode_iterations(&mut flipped_characters2);
+            split_iterations(&mut flipped_characters2);
+            let mut iter = flipped_characters2.iter();
+            let pair = create_recursive_pairs(&mut iter, Pair::None);
+            largest_magnitude = largest_magnitude.max(calculate_magnitude(pair));
+        }
+    }
+
+    println!("{}", largest_magnitude);
 
     Ok(())
 }
