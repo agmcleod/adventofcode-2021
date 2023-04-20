@@ -143,7 +143,7 @@ fn align_scanner(scanner1: &mut Scanner, scanner2: &Scanner) -> bool {
     return positional_alignment;
 }
 
-fn align_scanners(scanners: Vec<Scanner>) {
+fn align_scanners(scanners: Vec<Scanner>) -> HashMap<u32, Scanner> {
     let mut unaligned = HashMap::new();
     let mut visited = HashMap::new();
 
@@ -165,12 +165,16 @@ fn align_scanners(scanners: Vec<Scanner>) {
         for id in ids {
             let mut scanner2 = unaligned.remove(&id).unwrap();
             if align_scanner(&mut scanner2, &scanner) {
-                queue.push(scanner);
+                queue.push(scanner2);
             } else {
-                unaligned.insert(id, scanner);
+                unaligned.insert(id, scanner2);
             }
         }
+
+        visited.insert(scanner.id, scanner);
     }
+
+    visited
 }
 
 fn equal_distance_count(scanner_1: &Scanner, scanner_2: &Scanner) -> i32 {
@@ -240,7 +244,7 @@ fn position_differences(beacons: &Vec<Vector3<i32>>) -> Vec<Vector3<i32>> {
     let mut stack: Vec<&Vector3<i32>> = beacons.iter().collect();
 
     while let Some(beacon1) = stack.pop() {
-        for beacon2 in stack {
+        for beacon2 in &stack {
             differences.push(beacon1 - *beacon2);
         }
     }
@@ -356,6 +360,21 @@ fn main() -> Result<()> {
     for scanner in &mut scanners {
         scanner.compute_internal_distances();
     }
+
+    let aligned = align_scanners(scanners);
+
+    let mut beacons = Vec::new();
+    for scanner in aligned.values() {
+        let mut bs: Vec<Vector3<i32>> = scanner
+            .beacons
+            .iter()
+            .map(|v| scanner.orientation.unwrap() * v + scanner.position.unwrap())
+            .collect();
+        beacons.append(&mut bs);
+    }
+    beacons.sort_by(|x, y| compare_vector(&x, &y));
+    beacons.dedup_by(|x, y| compare_vector(&x, &y) == Ordering::Equal);
+    println!("{}", beacons.len().to_string());
 
     Ok(())
 }
