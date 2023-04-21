@@ -293,25 +293,22 @@ fn possible_orientations() -> Vec<Matrix3<i32>> {
         .into_iter()
         .permutations(3)
         .map(|e| Matrix3::from_iterator(e.concat().into_iter()))
-        .map(|m| {
-            let mut m2 = m.clone();
+        .flat_map(|m| {
+            let mut m2 = m;
             multiply_row(&mut m2, 0, -1);
             vec![m, m2]
         })
-        .flatten()
-        .map(|m| {
-            let mut m2 = m.clone();
+        .flat_map(|m| {
+            let mut m2 = m;
             multiply_row(&mut m2, 1, -1);
             vec![m, m2]
         })
-        .flatten()
-        .map(|m| {
-            let mut m2 = m.clone();
+        .flat_map(|m| {
+            let mut m2 = m;
             multiply_row(&mut m2, 2, -1);
             vec![m, m2]
         })
-        .flatten()
-        .filter(|m| det(&m) == 1)
+        .filter(|m| det(m) == 1)
         .collect();
     matrices
 }
@@ -319,7 +316,7 @@ fn possible_orientations() -> Vec<Matrix3<i32>> {
 fn multiply_row(matrix: &mut Matrix3<i32>, index: usize, scalar: i32) {
     for i in 0..3 {
         // column major matrix
-        matrix[i * 3 + index] = matrix[i * 3 + index] * scalar;
+        matrix[i * 3 + index] *= scalar;
     }
 }
 
@@ -389,6 +386,18 @@ fn main() -> Result<()> {
     beacons.sort_by(compare_vector);
     beacons.dedup_by(|x, y| compare_vector(x, y) == Ordering::Equal);
     println!("{}", beacons.len());
+
+    let mut max_distance = 0;
+
+    let mut stack: Vec<&Scanner> = aligned.values().collect();
+    while let Some(s1) = stack.pop() {
+        for s2 in &stack {
+            max_distance =
+                max_distance.max(get_distance(&s1.position.unwrap(), &s2.position.unwrap()));
+        }
+    }
+
+    println!("{}", max_distance);
 
     Ok(())
 }
