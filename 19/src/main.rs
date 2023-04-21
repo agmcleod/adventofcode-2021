@@ -1,6 +1,5 @@
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
-use std::f32;
+use std::collections::HashMap;
 use std::io::Result;
 
 use itertools::Itertools;
@@ -38,7 +37,7 @@ struct Scanner {
 impl Scanner {
     fn new(id: u32) -> Self {
         Scanner {
-            id: id,
+            id,
             beacons: Vec::new(),
             internal_distances: Vec::new(),
             position: None,
@@ -74,7 +73,7 @@ fn align_scanner(s1: &mut Scanner, s2: &Scanner) -> bool {
     );
 
     let mut s2_diffs: Vec<Vector3<i32>> = position_differences(&s2.beacons);
-    s2_diffs.sort_by(|v1, v2| compare_vector(&v1, v2));
+    s2_diffs.sort_by(compare_vector);
 
     // Step 1. Find correct configuration
     let mut rotational_alignment = false;
@@ -88,10 +87,10 @@ fn align_scanner(s1: &mut Scanner, s2: &Scanner) -> bool {
             .into_iter()
             .map(|v| rotation * v)
             .collect();
-        beacons.sort_by(|v1, v2| compare_vector(&v1, v2));
+        beacons.sort_by(compare_vector);
         // Compute new differences between beacons
         let mut diffs = position_differences(&beacons);
-        diffs.sort_by(|v1, v2| compare_vector(&v1, v2));
+        diffs.sort_by(compare_vector);
 
         let eq_diffs = equal_vector_count(&diffs, &s2_diffs);
 
@@ -115,7 +114,7 @@ fn align_scanner(s1: &mut Scanner, s2: &Scanner) -> bool {
         .into_iter()
         .map(|v| s2.orientation.unwrap() * v)
         .collect();
-    s2_beacons.sort_by(|v1, v2| compare_vector(&v1, v2));
+    s2_beacons.sort_by(compare_vector);
 
     let mut s1_beacons: Vec<Vector3<i32>> = s1
         .beacons
@@ -123,7 +122,7 @@ fn align_scanner(s1: &mut Scanner, s2: &Scanner) -> bool {
         .into_iter()
         .map(|v| orientation.unwrap() * v)
         .collect();
-    s1_beacons.sort_by(|v1, v2| compare_vector(&v1, v2));
+    s1_beacons.sort_by(compare_vector);
 
     let mut stack = s2_beacons.clone();
     'outer: while let Some(s2_beacon) = stack.pop() {
@@ -133,7 +132,7 @@ fn align_scanner(s1: &mut Scanner, s2: &Scanner) -> bool {
             let offset = s2_beacon - s1_beacon; // offset + x1 = x2 (if correct)
             let mut aligned_beacons: Vec<Vector3<i32>> =
                 s1_beacons.clone().into_iter().map(|v| offset + v).collect();
-            aligned_beacons.sort_by(|x, y| compare_vector(&x, &y));
+            aligned_beacons.sort_by(compare_vector);
 
             let eq = equal_vector_count(&aligned_beacons, &s2_beacons);
             if eq >= ALIGNMENT_THRESHOLD {
@@ -147,7 +146,7 @@ fn align_scanner(s1: &mut Scanner, s2: &Scanner) -> bool {
         s1.position = position;
         s1.orientation = orientation;
     }
-    return positional_alignment;
+    positional_alignment
 }
 
 fn align_scanners(scanners: Vec<Scanner>) -> HashMap<u32, Scanner> {
@@ -262,7 +261,7 @@ fn position_differences(beacons: &Vec<Vector3<i32>>) -> Vec<Vector3<i32>> {
         }
     }
 
-    differences.sort_by(|v1, v2| compare_vector(&v1, &v2));
+    differences.sort_by(compare_vector);
     differences
 }
 
@@ -346,8 +345,8 @@ fn main() -> Result<()> {
         }
 
         if line.starts_with("---") {
-            if scanner.is_some() {
-                scanners.push(scanner.unwrap());
+            if let Some(scanner) = scanner {
+                scanners.push(scanner);
             }
 
             scanner = Some(Scanner::new(id));
@@ -372,6 +371,7 @@ fn main() -> Result<()> {
     scanners.push(scanner.unwrap());
 
     for scanner in &mut scanners {
+        scanner.beacons.sort_by(compare_vector);
         scanner.compute_internal_distances();
     }
 
@@ -386,9 +386,9 @@ fn main() -> Result<()> {
             .collect();
         beacons.append(&mut bs);
     }
-    beacons.sort_by(|x, y| compare_vector(&x, &y));
-    beacons.dedup_by(|x, y| compare_vector(&x, &y) == Ordering::Equal);
-    println!("{}", beacons.len().to_string());
+    beacons.sort_by(compare_vector);
+    beacons.dedup_by(|x, y| compare_vector(x, y) == Ordering::Equal);
+    println!("{}", beacons.len());
 
     Ok(())
 }
