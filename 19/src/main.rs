@@ -6,6 +6,10 @@ use itertools::Itertools;
 use nalgebra::base::{Matrix3, Vector3};
 use read_input::read_text;
 
+// Credit to solution here: https://github.com/Jellycious/aoc-2021/blob/793f211292369fb3b7698f1569f55e37b26e6285/src/days/day19.rs#L202
+// I dont like cheating in advent of code. But I had a real hard time wrapping my head around how to determine position of scanners.
+// I could see a way to brute force the application of matrices to detect rotation, but didnt have a clear picture on how to bring it all together
+
 // The threshold for number of overlapping probes was 12, this constitutes to n*(n-1)/2 egdes.
 const ALIGNMENT_THRESHOLD: u32 = 12;
 const EDGE_THRESHOLD: u32 = ALIGNMENT_THRESHOLD * (ALIGNMENT_THRESHOLD - 1) / 2;
