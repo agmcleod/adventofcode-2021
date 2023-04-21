@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
+use std::f32;
 use std::io::Result;
 
 use itertools::Itertools;
@@ -67,8 +68,13 @@ fn get_distance(coord1: &Vector3<i32>, coord2: &Vector3<i32>) -> i32 {
 }
 
 fn align_scanner(scanner1: &mut Scanner, scanner2: &Scanner) -> bool {
-    let mut s2_diffs = position_differences(&scanner2.beacons);
-    // Maybe try this, but i think it should be sorted: s2_diffs.sort_by(|v1,v2| compare_vector(&v1,v2));
+    assert!(
+        scanner2.position.is_some() && scanner2.orientation.is_some(),
+        "'s2' must have a known orientation and position"
+    );
+    let s2_diffs = position_differences(&scanner2.beacons);
+    // Maybe try this, but i think it should be sorted:
+    // s2_diffs.sort_by(|v1, v2| compare_vector(&v1, v2));
 
     // Step 1 find the correct configuration
     let mut rotational_alignment = false;
@@ -174,6 +180,12 @@ fn align_scanners(scanners: Vec<Scanner>) -> HashMap<u32, Scanner> {
         visited.insert(scanner.id, scanner);
     }
 
+    assert_eq!(
+        unaligned.len(),
+        0,
+        "There are still unaligned scanners left over"
+    );
+
     visited
 }
 
@@ -230,11 +242,11 @@ fn equal_vector_count(s1: &Vec<Vector3<i32>>, s2: &Vec<Vector3<i32>>) -> u32 {
 // Uses the distances between beacons to find potential other scanners, which overlap
 // their regions with the scanner
 fn potential_neighbouring_scanners(scanner: &Scanner, unaligned: Vec<&Scanner>) -> Vec<u32> {
-    let mut minimal_eq_distance = (12 * 11) / 2;
+    let minimal_eq_distance = (12 * 11) / 2;
 
     unaligned
         .iter()
-        .filter(|scanner2| equal_distance_count(scanner, scanner2) >= minimal_eq_distance)
+        .filter(|scanner2| equal_distance_count(scanner, scanner2) > minimal_eq_distance)
         .map(|scanner| scanner.id)
         .collect()
 }
@@ -243,7 +255,8 @@ fn position_differences(beacons: &Vec<Vector3<i32>>) -> Vec<Vector3<i32>> {
     let mut differences = Vec::new();
     let mut stack: Vec<&Vector3<i32>> = beacons.iter().collect();
 
-    while let Some(beacon1) = stack.pop() {
+    while stack.len() > 1 {
+        let beacon1 = stack.pop().unwrap();
         for beacon2 in &stack {
             differences.push(beacon1 - *beacon2);
         }
