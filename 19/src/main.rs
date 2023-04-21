@@ -67,27 +67,29 @@ fn get_distance(coord1: &Vector3<i32>, coord2: &Vector3<i32>) -> i32 {
     (coord1.x - coord2.x).abs() + (coord1.y - coord2.y).abs() + (coord1.z - coord2.z).abs()
 }
 
-fn align_scanner(scanner1: &mut Scanner, scanner2: &Scanner) -> bool {
+fn align_scanner(s1: &mut Scanner, s2: &Scanner) -> bool {
     assert!(
-        scanner2.position.is_some() && scanner2.orientation.is_some(),
+        s2.position.is_some() && s2.orientation.is_some(),
         "'s2' must have a known orientation and position"
     );
-    let s2_diffs = position_differences(&scanner2.beacons);
-    // Maybe try this, but i think it should be sorted:
-    // s2_diffs.sort_by(|v1, v2| compare_vector(&v1, v2));
 
-    // Step 1 find the correct configuration
+    let mut s2_diffs: Vec<Vector3<i32>> = position_differences(&s2.beacons);
+    s2_diffs.sort_by(|v1, v2| compare_vector(&v1, v2));
+
+    // Step 1. Find correct configuration
     let mut rotational_alignment = false;
     let mut orientation = None;
 
     for rotation in possible_orientations() {
-        let mut beacons: Vec<Vector3<i32>> = scanner1
+        // Apply rotation to beacon locations
+        let mut beacons: Vec<Vector3<i32>> = s1
             .beacons
             .clone()
             .into_iter()
             .map(|v| rotation * v)
             .collect();
         beacons.sort_by(|v1, v2| compare_vector(&v1, v2));
+        // Compute new differences between beacons
         let mut diffs = position_differences(&beacons);
         diffs.sort_by(|v1, v2| compare_vector(&v1, v2));
 
@@ -95,28 +97,27 @@ fn align_scanner(scanner1: &mut Scanner, scanner2: &Scanner) -> bool {
 
         if eq_diffs >= EDGE_THRESHOLD {
             rotational_alignment = true;
-            orientation = Some(scanner2.orientation.unwrap() * rotation);
+            orientation = Some(s2.orientation.unwrap() * rotation);
             break;
         }
     }
-
     if !rotational_alignment {
         return false;
     }
 
-    // Step 2 find offset, which causes probes to overlap
+    // Step 2. Find offset, which causes probes to overlap
     let mut positional_alignment = false;
     let mut position: Option<Vector3<i32>> = None;
 
-    let mut s2_beacons: Vec<Vector3<i32>> = scanner2
+    let mut s2_beacons: Vec<Vector3<i32>> = s2
         .beacons
         .clone()
         .into_iter()
-        .map(|v| scanner2.orientation.unwrap() * v)
+        .map(|v| s2.orientation.unwrap() * v)
         .collect();
     s2_beacons.sort_by(|v1, v2| compare_vector(&v1, v2));
 
-    let mut s1_beacons: Vec<Vector3<i32>> = scanner1
+    let mut s1_beacons: Vec<Vector3<i32>> = s1
         .beacons
         .clone()
         .into_iter()
@@ -126,9 +127,10 @@ fn align_scanner(scanner1: &mut Scanner, scanner2: &Scanner) -> bool {
 
     let mut stack = s2_beacons.clone();
     'outer: while let Some(s2_beacon) = stack.pop() {
+        // Use s1_beacon as reference point
         for s1_beacon in s1_beacons.iter() {
             // align s2_beacon with s1_beacon and check whether alignment is correct
-            let offset = s2_beacon - s1_beacon;
+            let offset = s2_beacon - s1_beacon; // offset + x1 = x2 (if correct)
             let mut aligned_beacons: Vec<Vector3<i32>> =
                 s1_beacons.clone().into_iter().map(|v| offset + v).collect();
             aligned_beacons.sort_by(|x, y| compare_vector(&x, &y));
@@ -136,15 +138,14 @@ fn align_scanner(scanner1: &mut Scanner, scanner2: &Scanner) -> bool {
             let eq = equal_vector_count(&aligned_beacons, &s2_beacons);
             if eq >= ALIGNMENT_THRESHOLD {
                 positional_alignment = true;
-                position = Some(scanner2.position.unwrap() + offset);
+                position = Some(s2.position.unwrap() + offset);
                 break 'outer;
             }
         }
     }
-
     if positional_alignment {
-        scanner1.position = position;
-        scanner1.orientation = orientation;
+        s1.position = position;
+        s1.orientation = orientation;
     }
     return positional_alignment;
 }
@@ -153,39 +154,41 @@ fn align_scanners(scanners: Vec<Scanner>) -> HashMap<u32, Scanner> {
     let mut unaligned = HashMap::new();
     let mut visited = HashMap::new();
 
-    for s in scanners {
+    for s in scanners.into_iter() {
         unaligned.insert(s.id, s);
     }
 
-    // remove first scanner to make it the reference point
-    let mut scanner_0 = unaligned.remove(&1).unwrap();
-    scanner_0.position = Some(Vector3::from_element(0));
-    scanner_0.orientation = Some(Matrix3::identity());
+    // Remove first scanner and make it the base reference frame
+    let mut s0 = unaligned.remove(&1).unwrap();
+    s0.position = Some(Vector3::from_element(0));
+    s0.orientation = Some(Matrix3::identity());
 
     let mut queue = Vec::new();
-    queue.push(scanner_0);
+    queue.push(s0);
 
-    while let Some(scanner) = queue.pop() {
-        let ids = potential_neighbouring_scanners(&scanner, unaligned.values().collect());
-
+    // Align scanners through graph traversal
+    while let Some(scanner_info) = queue.pop() {
+        // Visit node and try to align neighbouring nodes
+        let ids = potential_neighbouring_scanners(&scanner_info, unaligned.values().collect());
+        // Remove potential candidates
         for id in ids {
-            let mut scanner2 = unaligned.remove(&id).unwrap();
-            if align_scanner(&mut scanner2, &scanner) {
-                queue.push(scanner2);
+            let mut s = unaligned.remove(&id).unwrap(); // temporariliy take ownership of scanner
+            let success = align_scanner(&mut s, &scanner_info);
+
+            // Check whether scanner was aligned successfully
+            if success {
+                queue.push(s); // scanner can be visited next
             } else {
-                unaligned.insert(id, scanner2);
+                unaligned.insert(id, s);
             }
         }
-
-        visited.insert(scanner.id, scanner);
+        visited.insert(scanner_info.id, scanner_info);
     }
-
     assert_eq!(
         unaligned.len(),
         0,
         "There are still unaligned scanners left over"
     );
-
     visited
 }
 
@@ -193,15 +196,13 @@ fn equal_distance_count(scanner_1: &Scanner, scanner_2: &Scanner) -> i32 {
     let d1 = &scanner_1.internal_distances;
     let d2 = &scanner_2.internal_distances;
     let mut count = 0;
-    let mut i1 = 0;
-    let mut i2 = 0;
+    let (mut i1, mut i2) = (0, 0);
     loop {
         if i1 >= d1.len() || i2 >= d2.len() {
             break;
-        }
-
-        // found an equal distance
+        } // loop guard
         if d1[i1].distance == d2[i2].distance {
+            // found an equal distance
             count += 1;
             i1 += 1;
             i2 += 1;
@@ -211,7 +212,6 @@ fn equal_distance_count(scanner_1: &Scanner, scanner_2: &Scanner) -> i32 {
             i1 += 1;
         }
     }
-
     count
 }
 
@@ -290,7 +290,7 @@ fn compare_vector(v1: &Vector3<i32>, v2: &Vector3<i32>) -> Ordering {
 
 /// Returns all possible orientations that the scanner could be in the form of rotation matrices
 fn possible_orientations() -> Vec<Matrix3<i32>> {
-    vec![vec![1, 0, 0], vec![0, 1, 0], vec![0, 0, 1]]
+    let matrices: Vec<Matrix3<i32>> = vec![vec![1, 0, 0], vec![0, 1, 0], vec![0, 0, 1]]
         .into_iter()
         .permutations(3)
         .map(|e| Matrix3::from_iterator(e.concat().into_iter()))
@@ -313,7 +313,8 @@ fn possible_orientations() -> Vec<Matrix3<i32>> {
         })
         .flatten()
         .filter(|m| det(&m) == 1)
-        .collect()
+        .collect();
+    matrices
 }
 
 fn multiply_row(matrix: &mut Matrix3<i32>, index: usize, scalar: i32) {
