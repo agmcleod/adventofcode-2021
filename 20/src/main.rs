@@ -36,7 +36,7 @@ fn main() -> Result<()> {
     let mut row = 0;
     let mut grid = HashMap::new();
 
-    let mut left_edge: i32 = 0;
+    let mut top_left_edge: i32 = 0;
 
     for line in text.lines() {
         if image_map.is_none() {
@@ -49,21 +49,37 @@ fn main() -> Result<()> {
         }
     }
 
-    let mut right_edge: i32 = grid.len() as i32;
+    let mut bottom_right_edge: i32 = grid.len() as i32;
 
-    for _ in 0..2 {
-        left_edge -= 2;
-        right_edge += 2;
+    top_left_edge -= 2;
+    bottom_right_edge += 2;
 
+    for step in 0..2 {
         let mut next_grid = grid.clone();
-        for row in left_edge..right_edge {
-            for col in left_edge..right_edge {
+        let mut adjust_top_left_edge = false;
+        let mut adjust_bottom_right_edge = false;
+        for row in top_left_edge..bottom_right_edge {
+            for col in top_left_edge..bottom_right_edge {
                 let index = get_binary_number(&grid, col, row);
-                next_grid.insert(
-                    (col, row),
-                    image_map.as_ref().unwrap().get(index).unwrap().to_owned(),
-                );
+                let resulting_value = image_map.as_ref().unwrap().get(index).unwrap().to_owned();
+
+                if (step == 0 && resulting_value == ".") || (step == 1 && resulting_value == "#") {
+                    if row <= top_left_edge + 2 || col <= top_left_edge + 2 {
+                        adjust_top_left_edge = true;
+                    } else if row >= bottom_right_edge - 2 || col >= bottom_right_edge - 2 {
+                        adjust_bottom_right_edge = true;
+                    }
+                }
+
+                next_grid.insert((col, row), resulting_value);
             }
+        }
+
+        if adjust_top_left_edge {
+            top_left_edge -= 2;
+        }
+        if adjust_bottom_right_edge {
+            bottom_right_edge += 2;
         }
 
         grid = next_grid;
@@ -80,8 +96,8 @@ fn main() -> Result<()> {
         })
     );
 
-    // for row in left_edge..right_edge {
-    //     for col in left_edge..right_edge {
+    // for row in top_left_edge..bottom_right_edge {
+    //     for col in top_left_edge..bottom_right_edge {
     //         print!("{}", grid.get(&(col, row)).unwrap());
     //     }
     //     println!();
