@@ -8,12 +8,9 @@ fn get_binary_number(grid: &HashMap<(i32, i32), String>, col: i32, row: i32) -> 
 
     for row_offset in -1..=1 {
         for col_offset in -1..=1 {
-            let empty = ".".to_string();
-            let value = grid
-                .get(&(col + col_offset, row + row_offset))
-                .unwrap_or(&empty);
+            let value = grid.get(&(col + col_offset, row + row_offset));
 
-            let n = match value.as_str() {
+            let n = match value.unwrap().as_ref() {
                 "#" => 1,
                 _ => 0,
             };
@@ -27,6 +24,14 @@ fn get_binary_number(grid: &HashMap<(i32, i32), String>, col: i32, row: i32) -> 
         .rev()
         .enumerate()
         .fold(0, |acc, (i, digit)| acc + 2i32.pow(i as u32) * *digit) as usize
+}
+
+fn pad_grid(grid: &mut HashMap<(i32, i32), String>, from: (i32, i32), to: (i32, i32)) {
+    for r in from.1..=to.1 {
+        for c in from.0..=to.0 {
+            grid.insert((r, c), ".".to_string());
+        }
+    }
 }
 
 fn main() -> Result<()> {
@@ -54,6 +59,8 @@ fn main() -> Result<()> {
     top_left_edge -= 2;
     bottom_right_edge += 2;
 
+    let image_map = image_map.as_ref().unwrap();
+
     for step in 0..2 {
         let mut next_grid = grid.clone();
         let mut adjust_top_left_edge = false;
@@ -61,7 +68,8 @@ fn main() -> Result<()> {
         for row in top_left_edge..bottom_right_edge {
             for col in top_left_edge..bottom_right_edge {
                 let index = get_binary_number(&grid, col, row);
-                let resulting_value = image_map.as_ref().unwrap().get(index).unwrap().to_owned();
+
+                let resulting_value = image_map.get(index).unwrap().to_owned();
 
                 if (step == 0 && resulting_value == ".") || (step == 1 && resulting_value == "#") {
                     if row <= top_left_edge + 2 || col <= top_left_edge + 2 {
@@ -96,11 +104,24 @@ fn main() -> Result<()> {
         })
     );
 
+    // let mut missing = Vec::new();
     // for row in top_left_edge..bottom_right_edge {
     //     for col in top_left_edge..bottom_right_edge {
-    //         print!("{}", grid.get(&(col, row)).unwrap());
+    //         if grid.get(&(col, row)).is_none() {
+    //             missing.push(format!(
+    //                 " did not find {},{} for range {} -> {}",
+    //                 col, row, top_left_edge, bottom_right_edge
+    //             ));
+    //             print!(".");
+    //         } else {
+    //             print!("{}", grid.get(&(col, row)).unwrap());
+    //         }
     //     }
     //     println!();
+    // }
+
+    // for m in &missing {
+    //     println!("{}", m);
     // }
 
     Ok(())
@@ -144,6 +165,6 @@ mod tests {
         grid.insert((3, 4), "#".to_string());
         grid.insert((4, 4), "#".to_string());
 
-        assert_eq!(get_binary_number(&grid, 2, 2), 34);
+        assert_eq!(get_binary_number(&mut grid, 2, 2), 34);
     }
 }
