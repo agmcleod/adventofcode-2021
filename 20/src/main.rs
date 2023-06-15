@@ -9,6 +9,13 @@ fn get_binary_number(grid: &HashMap<(i32, i32), String>, col: i32, row: i32) -> 
     for row_offset in -1..=1 {
         for col_offset in -1..=1 {
             let value = grid.get(&(col + col_offset, row + row_offset));
+            if value.is_none() {
+                println!(
+                    "coord: {:?}, finding {:?}",
+                    (col, row),
+                    (col + col_offset, row + row_offset)
+                );
+            }
 
             let n = match value.unwrap().as_ref() {
                 "#" => 1,
@@ -26,12 +33,73 @@ fn get_binary_number(grid: &HashMap<(i32, i32), String>, col: i32, row: i32) -> 
         .fold(0, |acc, (i, digit)| acc + 2i32.pow(i as u32) * *digit) as usize
 }
 
-fn pad_grid(grid: &mut HashMap<(i32, i32), String>, from: (i32, i32), to: (i32, i32)) {
+fn pad_grid_with_range(
+    grid: &mut HashMap<(i32, i32), String>,
+    image_map: &[String],
+    step: i32,
+    from: (i32, i32),
+    to: (i32, i32),
+) {
+    println!("Padding {:?} - {:?}", from, to);
+    let v = if step == 0 {
+        image_map.get(0).unwrap().clone()
+    } else {
+        // position 0 circles back to position 0
+        if image_map.get(0).unwrap() == "." {
+            ".".to_string()
+        } else {
+            image_map.get(511).unwrap().clone()
+        }
+    };
     for r in from.1..=to.1 {
         for c in from.0..=to.0 {
-            grid.insert((r, c), ".".to_string());
+            grid.entry((c, r)).or_insert_with(|| v.clone());
         }
     }
+}
+
+fn pad_grid(
+    grid: &mut HashMap<(i32, i32), String>,
+    image_map: &[String],
+    step: i32,
+    top_left_edge: i32,
+    bottom_right_edge: i32,
+) {
+    // top two rows
+    pad_grid_with_range(
+        grid,
+        image_map,
+        step,
+        (top_left_edge, top_left_edge),
+        (bottom_right_edge, top_left_edge + 1),
+    );
+
+    // bottom two rows
+    pad_grid_with_range(
+        grid,
+        image_map,
+        step,
+        (top_left_edge, bottom_right_edge - 1),
+        (bottom_right_edge, bottom_right_edge),
+    );
+
+    // left two rows
+    pad_grid_with_range(
+        grid,
+        image_map,
+        step,
+        (top_left_edge, top_left_edge),
+        (top_left_edge + 1, bottom_right_edge),
+    );
+
+    // right two rows
+    pad_grid_with_range(
+        grid,
+        image_map,
+        step,
+        (bottom_right_edge - 1, top_left_edge),
+        (bottom_right_edge, bottom_right_edge),
+    );
 }
 
 fn main() -> Result<()> {
@@ -42,31 +110,33 @@ fn main() -> Result<()> {
     let mut grid = HashMap::new();
 
     let mut top_left_edge: i32 = 0;
+    let mut bottom_right_edge: i32 = 0;
 
     for line in text.lines() {
         if image_map.is_none() {
             image_map = Some(line.chars().map(|c| c.to_string()).collect::<Vec<String>>());
         } else if !line.is_empty() {
             for (col, ch) in line.chars().enumerate() {
+                bottom_right_edge = bottom_right_edge.max(col as i32);
                 grid.insert((col as i32, row), ch.to_string());
             }
             row += 1;
         }
     }
 
-    let mut bottom_right_edge: i32 = grid.len() as i32;
-
     top_left_edge -= 2;
     bottom_right_edge += 2;
 
     let image_map = image_map.as_ref().unwrap();
 
+    pad_grid(&mut grid, image_map, 0, top_left_edge, bottom_right_edge);
+
     for step in 0..2 {
         let mut next_grid = grid.clone();
         let mut adjust_top_left_edge = false;
         let mut adjust_bottom_right_edge = false;
-        for row in top_left_edge..bottom_right_edge {
-            for col in top_left_edge..bottom_right_edge {
+        for row in (top_left_edge + 2)..=(bottom_right_edge - 2) {
+            for col in (top_left_edge + 2)..=(bottom_right_edge - 2) {
                 let index = get_binary_number(&grid, col, row);
 
                 let resulting_value = image_map.get(index).unwrap().to_owned();
@@ -85,9 +155,13 @@ fn main() -> Result<()> {
 
         if adjust_top_left_edge {
             top_left_edge -= 2;
+
+            pad_grid(&mut grid, image_map, 1, top_left_edge, bottom_right_edge);
         }
         if adjust_bottom_right_edge {
             bottom_right_edge += 2;
+
+            pad_grid(&mut grid, image_map, 1, top_left_edge, bottom_right_edge);
         }
 
         grid = next_grid;
