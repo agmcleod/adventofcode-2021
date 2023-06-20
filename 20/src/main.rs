@@ -33,27 +33,39 @@ fn get_binary_number(grid: &HashMap<(i32, i32), String>, col: i32, row: i32) -> 
         .fold(0, |acc, (i, digit)| acc + 2i32.pow(i as u32) * *digit) as usize
 }
 
+fn display_grid(grid: &HashMap<(i32, i32), String>, top_left_edge: i32, bottom_right_edge: i32) {
+    for row in top_left_edge..=bottom_right_edge {
+        for col in top_left_edge..=bottom_right_edge {
+            if grid.contains_key(&(col, row)) {
+                print!("{}", grid.get(&(col, row)).unwrap());
+            } else {
+                print!("-");
+            }
+        }
+        println!();
+    }
+}
+
 fn pad_grid_with_range(
     grid: &mut HashMap<(i32, i32), String>,
     image_map: &[String],
     step: i32,
     from: (i32, i32),
     to: (i32, i32),
+    force: bool,
 ) {
-    println!("Padding {:?} - {:?}", from, to);
-    let v = if step == 0 {
-        image_map.get(0).unwrap().clone()
+    let v = if step % 2 == 0 {
+        ".".to_string()
     } else {
-        // position 0 circles back to position 0
-        if image_map.get(0).unwrap() == "." {
-            ".".to_string()
-        } else {
-            image_map.get(511).unwrap().clone()
-        }
+        image_map.get(0).unwrap().clone()
     };
     for r in from.1..=to.1 {
         for c in from.0..=to.0 {
-            grid.entry((c, r)).or_insert_with(|| v.clone());
+            if force {
+                grid.insert((c, r), v.clone());
+            } else {
+                grid.entry((c, r)).or_insert_with(|| v.clone());
+            }
         }
     }
 }
@@ -72,6 +84,7 @@ fn pad_grid(
         step,
         (top_left_edge, top_left_edge),
         (bottom_right_edge, top_left_edge + 1),
+        false,
     );
 
     // bottom two rows
@@ -81,6 +94,7 @@ fn pad_grid(
         step,
         (top_left_edge, bottom_right_edge - 1),
         (bottom_right_edge, bottom_right_edge),
+        false,
     );
 
     // left two rows
@@ -90,6 +104,7 @@ fn pad_grid(
         step,
         (top_left_edge, top_left_edge),
         (top_left_edge + 1, bottom_right_edge),
+        false,
     );
 
     // right two rows
@@ -99,7 +114,11 @@ fn pad_grid(
         step,
         (bottom_right_edge - 1, top_left_edge),
         (bottom_right_edge, bottom_right_edge),
+        false,
     );
+
+    // println!("finished padding:");
+    // display_grid(grid, top_left_edge, bottom_right_edge);
 }
 
 fn main() -> Result<()> {
@@ -131,41 +150,72 @@ fn main() -> Result<()> {
 
     pad_grid(&mut grid, image_map, 0, top_left_edge, bottom_right_edge);
 
-    for step in 0..2 {
+    for step in 0..50 {
         let mut next_grid = grid.clone();
-        let mut adjust_top_left_edge = false;
-        let mut adjust_bottom_right_edge = false;
-        for row in (top_left_edge + 2)..=(bottom_right_edge - 2) {
-            for col in (top_left_edge + 2)..=(bottom_right_edge - 2) {
+        for row in (top_left_edge + 1)..=(bottom_right_edge - 1) {
+            for col in (top_left_edge + 1)..=(bottom_right_edge - 1) {
                 let index = get_binary_number(&grid, col, row);
 
                 let resulting_value = image_map.get(index).unwrap().to_owned();
-
-                if (step == 0 && resulting_value == ".") || (step == 1 && resulting_value == "#") {
-                    if row <= top_left_edge + 2 || col <= top_left_edge + 2 {
-                        adjust_top_left_edge = true;
-                    } else if row >= bottom_right_edge - 2 || col >= bottom_right_edge - 2 {
-                        adjust_bottom_right_edge = true;
-                    }
-                }
 
                 next_grid.insert((col, row), resulting_value);
             }
         }
 
-        if adjust_top_left_edge {
-            top_left_edge -= 2;
-
-            pad_grid(&mut grid, image_map, 1, top_left_edge, bottom_right_edge);
-        }
-        if adjust_bottom_right_edge {
-            bottom_right_edge += 2;
-
-            pad_grid(&mut grid, image_map, 1, top_left_edge, bottom_right_edge);
-        }
-
         grid = next_grid;
+
+        let outer_edge_step = if step % 2 == 0 { 1 } else { 0 };
+
+        // replace outer edges with next step of padding
+        pad_grid_with_range(
+            &mut grid,
+            image_map,
+            outer_edge_step,
+            (top_left_edge, top_left_edge),
+            (bottom_right_edge, top_left_edge),
+            true,
+        );
+        pad_grid_with_range(
+            &mut grid,
+            image_map,
+            outer_edge_step,
+            (top_left_edge, top_left_edge),
+            (top_left_edge, bottom_right_edge),
+            true,
+        );
+        pad_grid_with_range(
+            &mut grid,
+            image_map,
+            outer_edge_step,
+            (top_left_edge, bottom_right_edge),
+            (bottom_right_edge, bottom_right_edge),
+            true,
+        );
+        pad_grid_with_range(
+            &mut grid,
+            image_map,
+            outer_edge_step,
+            (bottom_right_edge, top_left_edge),
+            (bottom_right_edge, bottom_right_edge),
+            true,
+        );
+
+        // if step % 2 == 0 {
+        top_left_edge -= 2;
+        bottom_right_edge += 2;
+
+        pad_grid(
+            &mut grid,
+            image_map,
+            step + 1,
+            top_left_edge,
+            bottom_right_edge,
+        );
+        // }
     }
+
+    // println!("result");
+    // display_grid(&grid, top_left_edge, bottom_right_edge);
 
     println!(
         "{}",
@@ -177,26 +227,6 @@ fn main() -> Result<()> {
             }
         })
     );
-
-    // let mut missing = Vec::new();
-    // for row in top_left_edge..bottom_right_edge {
-    //     for col in top_left_edge..bottom_right_edge {
-    //         if grid.get(&(col, row)).is_none() {
-    //             missing.push(format!(
-    //                 " did not find {},{} for range {} -> {}",
-    //                 col, row, top_left_edge, bottom_right_edge
-    //             ));
-    //             print!(".");
-    //         } else {
-    //             print!("{}", grid.get(&(col, row)).unwrap());
-    //         }
-    //     }
-    //     println!();
-    // }
-
-    // for m in &missing {
-    //     println!("{}", m);
-    // }
 
     Ok(())
 }
