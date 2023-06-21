@@ -34,10 +34,6 @@ fn main() {
     loop {
         p1_pos = deterministically_move_player(p1_pos, &mut deterministic_die);
         p1_score += p1_pos;
-        // println!(
-        //     "p1 pos {} score {} final die {}",
-        //     p1_pos, p1_score, deterministic_die
-        // );
         die_rolls += 3;
 
         if p1_score >= 1000 {
@@ -56,4 +52,9 @@ fn main() {
     println!("{} {} {}", p1_score, p2_score, die_rolls);
     let score = p1_score.min(p2_score);
     println!("{}", score * die_rolls);
+
+    p1_pos = PLAYER_1_POS;
+    p2_pos = PLAYER_1_POS;
+    p1_score = 0;
+    p2_score = 0;
 }
