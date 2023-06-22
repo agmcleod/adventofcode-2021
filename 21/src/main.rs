@@ -1,5 +1,7 @@
-const PLAYER_1_POS: usize = 7;
-const PLAYER_2_POS: usize = 6;
+use std::collections::HashMap;
+
+const PLAYER_1_POS: usize = 4;
+const PLAYER_2_POS: usize = 8;
 
 fn next_die(deterministic_die: &mut usize) {
     *deterministic_die = (*deterministic_die + 1) % 100;
@@ -20,6 +22,25 @@ fn deterministically_move_player(pos: usize, deterministic_die: &mut usize) -> u
         10
     } else {
         new_pos % 10
+    }
+}
+
+#[derive(Clone)]
+struct GameState {
+    p1_pos: usize,
+    p2_pos: usize,
+    p1_score: usize,
+    p2_score: usize,
+}
+
+impl GameState {
+    fn new(p1_pos: usize, p2_pos: usize, p1_score: usize, p2_score: usize) -> Self {
+        GameState {
+            p1_pos,
+            p2_pos,
+            p1_score,
+            p2_score,
+        }
     }
 }
 
@@ -53,8 +74,61 @@ fn main() {
     let score = p1_score.min(p2_score);
     println!("{}", score * die_rolls);
 
-    p1_pos = PLAYER_1_POS;
-    p2_pos = PLAYER_1_POS;
-    p1_score = 0;
-    p2_score = 0;
+    let mut die_permutations = HashMap::new();
+
+    for i in 1..=3 {
+        for j in 1..=3 {
+            for k in 1..=3 {
+                let key = i + j + k;
+                if die_permutations.contains_key(&key) {
+                    *die_permutations.get_mut(&key).unwrap() += 1;
+                } else {
+                    die_permutations.insert(key, 1);
+                }
+            }
+        }
+    }
+
+    let mut work = vec![GameState::new(PLAYER_1_POS, PLAYER_2_POS, 0, 0)];
+
+    let mut p1_universes = 0usize;
+    let mut p2_universes = 0usize;
+
+    loop {
+        let state = work.pop();
+        if state.is_none() {
+            break;
+        }
+
+        let state = state.unwrap();
+
+        for (p1_roll, p1_iterations) in &die_permutations {
+            for (p2_roll, p2_iterations) in &die_permutations {
+                let mut state = state.clone();
+                state.p1_pos = (state.p1_pos + *p1_roll) % 10;
+                if state.p1_pos == 0 {
+                    state.p1_pos = 10;
+                }
+
+                state.p1_score += state.p1_pos;
+
+                state.p2_pos = (state.p2_pos + *p2_roll) % 10;
+                if state.p2_pos == 0 {
+                    state.p2_pos = 10;
+                }
+
+                state.p2_score += state.p2_pos;
+
+                if state.p1_score >= 21 {
+                    p1_universes += p1_iterations;
+                } else if state.p2_score >= 21 {
+                    p2_universes += p2_iterations;
+                } else {
+                    work.push(state);
+                }
+            }
+        }
+    }
+
+    println!("{} {}", p1_universes, p2_universes);
 }
