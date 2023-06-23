@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 const PLAYER_1_POS: usize = 4;
 const PLAYER_2_POS: usize = 8;
 
@@ -74,17 +72,12 @@ fn main() {
     let score = p1_score.min(p2_score);
     println!("{}", score * die_rolls);
 
-    let mut die_permutations = HashMap::new();
+    let mut die_permutations = Vec::new();
 
     for i in 1..=3 {
         for j in 1..=3 {
             for k in 1..=3 {
-                let key = i + j + k;
-                if die_permutations.contains_key(&key) {
-                    *die_permutations.get_mut(&key).unwrap() += 1;
-                } else {
-                    die_permutations.insert(key, 1);
-                }
+                die_permutations.push(i + j + k);
             }
         }
     }
@@ -102,8 +95,8 @@ fn main() {
 
         let state = state.unwrap();
 
-        for (p1_roll, p1_iterations) in &die_permutations {
-            for (p2_roll, p2_iterations) in &die_permutations {
+        for p1_roll in &die_permutations {
+            for p2_roll in &die_permutations {
                 let mut state = state.clone();
                 state.p1_pos = (state.p1_pos + *p1_roll) % 10;
                 if state.p1_pos == 0 {
@@ -120,9 +113,9 @@ fn main() {
                 state.p2_score += state.p2_pos;
 
                 if state.p1_score >= 21 {
-                    p1_universes += p1_iterations;
+                    p1_universes += 1;
                 } else if state.p2_score >= 21 {
-                    p2_universes += p2_iterations;
+                    p2_universes += 1;
                 } else {
                     work.push(state);
                 }
