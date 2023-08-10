@@ -1,3 +1,6 @@
+use std::collections::hash_map::Entry::Vacant;
+use std::collections::HashMap;
+
 const PLAYER_1_POS: usize = 4;
 const PLAYER_2_POS: usize = 8;
 
@@ -27,6 +30,7 @@ fn deterministically_move_player(pos: usize, deterministic_die: &mut usize) -> u
 struct GameState {
     p1_pos: usize,
     p2_pos: usize,
+    universe: usize,
     p1_score: usize,
     p2_score: usize,
 }
@@ -36,6 +40,7 @@ impl GameState {
         GameState {
             p1_pos,
             p2_pos,
+            universe: 1,
             p1_score,
             p2_score,
         }
@@ -72,12 +77,17 @@ fn main() {
     let score = p1_score.min(p2_score);
     println!("{}", score * die_rolls);
 
-    let mut die_permutations = Vec::new();
+    let mut die_permutations = HashMap::new();
 
     for i in 1..=3 {
         for j in 1..=3 {
             for k in 1..=3 {
-                die_permutations.push(i + j + k);
+                let sum = i + j + k;
+                if let Vacant(e) = die_permutations.entry(sum) {
+                    e.insert(1);
+                } else {
+                    *die_permutations.get_mut(&sum).unwrap() += 1;
+                }
             }
         }
     }
@@ -95,8 +105,8 @@ fn main() {
 
         let state = state.unwrap();
 
-        for p1_roll in &die_permutations {
-            for p2_roll in &die_permutations {
+        for (p1_roll, p1_roll_count) in &die_permutations {
+            for (p2_roll, p2_roll_count) in &die_permutations {
                 let mut state = state.clone();
                 state.p1_pos = (state.p1_pos + *p1_roll) % 10;
                 if state.p1_pos == 0 {
@@ -113,15 +123,21 @@ fn main() {
                 state.p2_score += state.p2_pos;
 
                 if state.p1_score >= 21 {
-                    p1_universes += 1;
+                    p1_universes += state.universe + p1_roll_count;
                 } else if state.p2_score >= 21 {
-                    p2_universes += 1;
+                    p2_universes += state.universe + p2_roll_count;
                 } else {
+                    state.universe += p1_roll_count + p2_roll_count;
                     work.push(state);
                 }
             }
         }
     }
 
-    println!("{} {}", p1_universes, p2_universes);
+    println!(
+        "{} {}, p1 won? {}",
+        p1_universes,
+        p2_universes,
+        p1_universes > p2_universes
+    );
 }
