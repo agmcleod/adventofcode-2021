@@ -1,5 +1,6 @@
 use std::collections::hash_map::Entry::Vacant;
 use std::collections::HashMap;
+use std::fmt::Display;
 
 const PLAYER_1_POS: usize = 4;
 const PLAYER_2_POS: usize = 8;
@@ -44,6 +45,16 @@ impl GameState {
             p1_score,
             p2_score,
         }
+    }
+}
+
+impl Display for GameState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "p1 pos {} score {}, p2 pos {} score {}, universe #{}",
+            self.p1_pos, self.p1_score, self.p2_pos, self.p2_score, self.universe
+        )
     }
 }
 
@@ -92,19 +103,17 @@ fn main() {
         }
     }
 
+    // each sum of a doce roll out come takes 3 dice to get there, so we multiple the count of outcomes by 3 die rolls.
+    for roll_count in die_permutations.values_mut() {
+        *roll_count *= 3;
+    }
+
     let mut work = vec![GameState::new(PLAYER_1_POS, PLAYER_2_POS, 0, 0)];
 
     let mut p1_universes = 0usize;
     let mut p2_universes = 0usize;
 
-    loop {
-        let state = work.pop();
-        if state.is_none() {
-            break;
-        }
-
-        let state = state.unwrap();
-
+    while let Some(state) = work.pop() {
         for (p1_roll, p1_roll_count) in &die_permutations {
             for (p2_roll, p2_roll_count) in &die_permutations {
                 let mut state = state.clone();
@@ -122,16 +131,31 @@ fn main() {
 
                 state.p2_score += state.p2_pos;
 
+                let mut next_universe = state.universe * p1_roll_count;
+
+                let mut has_won = false;
                 if state.p1_score >= 21 {
-                    p1_universes += state.universe * p1_roll_count;
-                } else if state.p2_score >= 21 {
-                    p2_universes += state.universe * p2_roll_count;
+                    p1_universes += next_universe;
+                    has_won = true;
                 } else {
-                    state.universe *= p1_roll_count * p2_roll_count;
+                    next_universe *= p2_roll_count;
+                }
+                if !has_won && state.p2_score >= 21 {
+                    p2_universes += next_universe;
+                    has_won = true;
+                }
+
+                state.universe += next_universe;
+                if !has_won {
                     work.push(state);
                 }
             }
         }
+
+        for state in &work {
+            println!("{}", state);
+        }
+        break;
     }
 
     println!(
