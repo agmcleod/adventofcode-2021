@@ -123,11 +123,11 @@ fn main() {
                 state.p2_score += state.p2_pos;
 
                 if state.p1_score >= 21 {
-                    p1_universes += state.universe + p1_roll_count;
+                    p1_universes += state.universe * p1_roll_count;
                 } else if state.p2_score >= 21 {
-                    p2_universes += state.universe + p2_roll_count;
+                    p2_universes += state.universe * p2_roll_count;
                 } else {
-                    state.universe += p1_roll_count + p2_roll_count;
+                    state.universe *= p1_roll_count * p2_roll_count;
                     work.push(state);
                 }
             }
