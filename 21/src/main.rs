@@ -1,9 +1,9 @@
-use std::collections::hash_map::Entry::Vacant;
-use std::collections::HashMap;
 use std::fmt::Display;
 
 const PLAYER_1_POS: usize = 4;
 const PLAYER_2_POS: usize = 8;
+
+const PART_TWO_SCORE: usize = 21;
 
 fn next_die(deterministic_die: &mut usize) {
     *deterministic_die = (*deterministic_die + 1) % 100;
@@ -34,6 +34,8 @@ struct GameState {
     universe: usize,
     p1_score: usize,
     p2_score: usize,
+    p1_roll_value: usize,
+    p2_roll_value: usize,
 }
 
 impl GameState {
@@ -44,6 +46,8 @@ impl GameState {
             universe: 1,
             p1_score,
             p2_score,
+            p1_roll_value: 0,
+            p2_roll_value: 0,
         }
     }
 }
@@ -52,8 +56,14 @@ impl Display for GameState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "p1 pos {} score {}, p2 pos {} score {}, universe #{}",
-            self.p1_pos, self.p1_score, self.p2_pos, self.p2_score, self.universe
+            "p1 pos {} roll {} score {}, p2 pos {} roll {} score {}, universe #{}",
+            self.p1_pos,
+            self.p1_roll_value,
+            self.p1_score,
+            self.p2_pos,
+            self.p2_roll_value,
+            self.p2_score,
+            self.universe
         )
     }
 }
@@ -88,24 +98,15 @@ fn main() {
     let score = p1_score.min(p2_score);
     println!("{}", score * die_rolls);
 
-    let mut die_permutations = HashMap::new();
+    let mut die_permutations = Vec::new();
 
     for i in 1..=3 {
         for j in 1..=3 {
             for k in 1..=3 {
                 let sum = i + j + k;
-                if let Vacant(e) = die_permutations.entry(sum) {
-                    e.insert(1);
-                } else {
-                    *die_permutations.get_mut(&sum).unwrap() += 1;
-                }
+                die_permutations.push(sum);
             }
         }
-    }
-
-    // each sum of a doce roll out come takes 3 dice to get there, so we multiple the count of outcomes by 3 die rolls.
-    for roll_count in die_permutations.values_mut() {
-        *roll_count *= 3;
     }
 
     let mut work = vec![GameState::new(PLAYER_1_POS, PLAYER_2_POS, 0, 0)];
@@ -114,9 +115,10 @@ fn main() {
     let mut p2_universes = 0usize;
 
     while let Some(state) = work.pop() {
-        for (p1_roll, p1_roll_count) in &die_permutations {
-            for (p2_roll, p2_roll_count) in &die_permutations {
+        for p1_roll in &die_permutations {
+            for p2_roll in &die_permutations {
                 let mut state = state.clone();
+                state.p1_roll_value = *p1_roll;
                 state.p1_pos = (state.p1_pos + *p1_roll) % 10;
                 if state.p1_pos == 0 {
                     state.p1_pos = 10;
@@ -124,6 +126,7 @@ fn main() {
 
                 state.p1_score += state.p1_pos;
 
+                state.p2_roll_value = *p2_roll;
                 state.p2_pos = (state.p2_pos + *p2_roll) % 10;
                 if state.p2_pos == 0 {
                     state.p2_pos = 10;
@@ -131,31 +134,23 @@ fn main() {
 
                 state.p2_score += state.p2_pos;
 
-                let mut next_universe = state.universe * p1_roll_count;
+                if state.p1_score >= PART_TWO_SCORE {
+                    p1_universes += state.universe;
+                    break;
+                }
 
-                let mut has_won = false;
-                if state.p1_score >= 21 {
-                    p1_universes += next_universe;
-                    has_won = true;
+                if state.p2_score >= PART_TWO_SCORE {
+                    p2_universes += state.universe;
                 } else {
-                    next_universe *= p2_roll_count;
-                }
-                if !has_won && state.p2_score >= 21 {
-                    p2_universes += next_universe;
-                    has_won = true;
-                }
-
-                state.universe += next_universe;
-                if !has_won {
                     work.push(state);
                 }
             }
         }
 
-        for state in &work {
-            println!("{}", state);
-        }
-        break;
+        // for state in &work {
+        //     println!("{}", state);
+        // }
+        // break;
     }
 
     println!(
