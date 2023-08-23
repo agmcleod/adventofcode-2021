@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::{fmt::Display, io::Result};
 
@@ -105,7 +106,7 @@ fn main() -> Result<()> {
 
         let mut cubes_to_process = vec![Cube::new(x_range, y_range, z_range)];
 
-        while let Some(cube) = cubes_to_process.pop() {
+        while let Some(mut cube) = cubes_to_process.pop() {
             while let Some(cube_two) = intersected_cubes.pop() {
                 if cubes_intersect(&cube, &cube_two) {
                     if is_on {
@@ -113,27 +114,61 @@ fn main() -> Result<()> {
                         // This will have overlapping areas between axis
                         // Can optimize later if needed
                         // Not sure of the right approach at this time
-                        if cube.x.0 < cube_two.x.0 {
-                            cubes_to_process.push(Cube::new(
-                                (cube.x.0, cube_two.x.0 - 1),
-                                cube.y,
-                                cube.z,
-                            ));
-                        }
-                        if cube.x.1 > cube_two.x.1 {
-                            cubes_to_process.push(Cube::new(
-                                (cube.x.1 + 1, cube_two.x.1),
-                                cube.y,
-                                cube.z,
-                            ));
+                        match cube.x.0.cmp(&cube_two.x.0) {
+                            Ordering::Less => {
+                                cubes_to_process.push(Cube::new(
+                                    (cube.x.0, cube_two.x.0 - 1),
+                                    cube.y,
+                                    cube.z,
+                                ));
+                                cube.x.0 = cube_two.x.0;
+                            }
+                            Ordering::Greater => {
+                                modified_cubes.push(Cube::new(
+                                    (cube_two.x.0, cube.x.0),
+                                    cube_two.y,
+                                    cube_two.z,
+                                ));
+                            }
+                            _ => {}
                         }
 
-                        if cube.y.0 < cube_two.y.0 {
-                            cubes_to_process.push(Cube::new(
-                                cube.x,
-                                (cube.y.0, cube_two.y.0 - 1),
-                                cube.z,
-                            ));
+                        match cube.x.1.cmp(&cube_two.x.1) {
+                            Ordering::Greater => {
+                                cubes_to_process.push(Cube::new(
+                                    (cube.x.1, cube_two.x.1),
+                                    cube.y,
+                                    cube.z,
+                                ));
+                                cube.x.1 = cube_two.x.1;
+                            }
+                            Ordering::Less => {
+                                modified_cubes.push(Cube::new(
+                                    (cube.x.1, cube_two.x.1),
+                                    cube_two.y,
+                                    cube_two.z,
+                                ));
+                            }
+                            _ => {}
+                        }
+
+                        match cube.y.0.cmp(&cube_two.y.0) {
+                            Ordering::Less => {
+                                cubes_to_process.push(Cube::new(
+                                    cube.x,
+                                    (cube.y.0, cube_two.y.0),
+                                    cube.z,
+                                ));
+                                cube.y.0 = cube_two.y.0;
+                            }
+                            Ordering::Greater => {
+                                modified_cubes.push(Cube::new(
+                                    cube_two.x,
+                                    (cube_two.y.0, cube.y.0),
+                                    cube_two.z,
+                                ));
+                            }
+                            _ => {}
                         }
                         if cube.y.1 > cube_two.y.1 {
                             cubes_to_process.push(Cube::new(
@@ -141,6 +176,7 @@ fn main() -> Result<()> {
                                 (cube.y.1 + 1, cube_two.y.1),
                                 cube.z,
                             ));
+                            cube.y.1 = cube_two.y.1;
                         }
 
                         if cube.z.0 < cube_two.z.0 {
@@ -149,6 +185,7 @@ fn main() -> Result<()> {
                                 cube.y,
                                 (cube.z.0, cube_two.z.0 - 1),
                             ));
+                            cube.z.0 = cube_two.z.0;
                         }
                         if cube.z.1 > cube_two.z.1 {
                             cubes_to_process.push(Cube::new(
@@ -156,6 +193,7 @@ fn main() -> Result<()> {
                                 cube.y,
                                 (cube.z.1 + 1, cube_two.z.1),
                             ));
+                            cube.z.1 = cube_two.z.1;
                         }
                     }
                 } else {
