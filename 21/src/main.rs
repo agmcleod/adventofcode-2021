@@ -1,9 +1,9 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
 const PLAYER_1_POS: usize = 4;
 const PLAYER_2_POS: usize = 8;
 
-const PART_TWO_SCORE: usize = 21;
+const PART_TWO_SCORE: usize = 10;
 
 fn next_die(deterministic_die: &mut usize) {
     *deterministic_die = (*deterministic_die + 1) % 100;
@@ -114,7 +114,20 @@ fn main() {
     let mut p1_universes = 0usize;
     let mut p2_universes = 0usize;
 
+    let mut part_two_cache = HashMap::new();
+
     while let Some(state) = work.pop() {
+        if let Some((p1_unis, p2_unis)) =
+            part_two_cache.get(&(state.p1_pos, state.p2_pos, state.p1_score, state.p2_score))
+        {
+            p1_universes += p1_unis;
+            p2_universes += p2_unis;
+            continue;
+        }
+
+        let mut p1_universes_for_this_state = 0;
+        let mut p2_universes_for_this_state = 0;
+
         for p1_roll in &die_permutations {
             for p2_roll in &die_permutations {
                 let mut state = state.clone();
@@ -135,17 +148,25 @@ fn main() {
                 state.p2_score += state.p2_pos;
 
                 if state.p1_score >= PART_TWO_SCORE {
-                    p1_universes += state.universe;
+                    p1_universes_for_this_state += state.universe;
                     break;
                 }
 
                 if state.p2_score >= PART_TWO_SCORE {
-                    p2_universes += state.universe;
+                    p2_universes_for_this_state += state.universe;
                 } else {
                     work.push(state);
                 }
             }
         }
+
+        part_two_cache.insert(
+            (state.p1_pos, state.p2_pos, state.p1_score, state.p2_score),
+            (p1_universes_for_this_state, p2_universes_for_this_state),
+        );
+
+        p1_universes += p1_universes_for_this_state;
+        p2_universes += p2_universes_for_this_state;
 
         // for state in &work {
         //     println!("{}", state);
