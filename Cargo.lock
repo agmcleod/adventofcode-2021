@@ -650,6 +650,13 @@ name = "twentyone"
 version = "0.1.0"
 
 [[package]]
+name = "twentytwo"
+version = "0.1.0"
+dependencies = [
+ "read_input",
+]
+
+[[package]]
 name = "two"
 version = "0.1.0"
 dependencies = [
