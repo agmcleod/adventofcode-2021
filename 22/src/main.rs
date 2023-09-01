@@ -19,7 +19,7 @@ impl Cube {
         }
     }
 
-    fn get_axis(&self, axis: Axis) -> (i32, i32) {
+    fn get_axis(&self, axis: &Axis) -> (i32, i32) {
         match axis {
             Axis::X => self.x,
             Axis::Y => self.y,
@@ -45,6 +45,7 @@ impl Cube {
     }
 }
 
+#[derive(Copy, Clone)]
 enum Axis {
     X,
     Y,
@@ -110,6 +111,7 @@ fn handle_min_range_comparison(
     cubes_to_process: &mut Vec<Cube>,
     modified_cubes: &mut Vec<Cube>,
     axis: Axis,
+    is_on: bool,
 ) {
     let values_to_compare = match axis {
         Axis::X => (cube.x.0, cube_two.x.0),
@@ -134,8 +136,13 @@ fn handle_min_range_comparison(
                 }
             }
 
-            cubes_to_process.push(Cube::new(axis_values[0], axis_values[1], axis_values[2]));
-            cube.set_axis_value(axis, AxisSlot::First, cube_two.get_axis(axis).0);
+            let new_cube = Cube::new(axis_values[0], axis_values[1], axis_values[2]);
+            if is_on {
+                modified_cubes.push(new_cube);
+            } else {
+                cubes_to_process.push(new_cube);
+            }
+            cube.set_axis_value(axis, AxisSlot::First, cube_two.get_axis(&axis).0);
         }
         // the new cube is inside of the axis
         Ordering::Greater => {
@@ -167,6 +174,7 @@ fn handle_max_range_comparison(
     cubes_to_process: &mut Vec<Cube>,
     modified_cubes: &mut Vec<Cube>,
     axis: Axis,
+    is_on: bool,
 ) {
     let values_to_compare = match axis {
         Axis::X => (cube.x.1, cube_two.x.1),
@@ -187,9 +195,15 @@ fn handle_max_range_comparison(
                 Axis::Z => axis_values[2] = (cube_two.z.1 + 1, cube.z.1),
             }
 
-            cubes_to_process.push(Cube::new(axis_values[0], axis_values[1], axis_values[2]));
+            let new_cube = Cube::new(axis_values[0], axis_values[1], axis_values[2]);
+            if is_on {
+                cubes_to_process.push(new_cube);
+            } else {
+                modified_cubes.push(new_cube);
+            }
 
-            cube.set_axis_value(axis, AxisSlot::Second, cube_two.get_axis(axis).1);
+            // TODO: need to update this to work with on/off, as well as whether this cube needs to go back into the list
+            cube.set_axis_value(axis, AxisSlot::Second, cube_two.get_axis(&axis).1);
         }
         // the new cube is inside the far edge of the axis
         Ordering::Less => {
@@ -207,9 +221,8 @@ fn handle_max_range_comparison(
                 }
             }
 
-            modified_cubes.push(Cube::new((cube.x.1, cube_two.x.1), cube_two.y, cube_two.z));
-
-            // TODO: need to remove the inside cube now
+            let new_cube = Cube::new(axis_values[0], axis_values[1], axis_values[2]);
+            modified_cubes.push(new_cube);
         }
         _ => {}
     }
@@ -250,63 +263,63 @@ fn main() -> Result<()> {
         while let Some(mut cube) = cubes_to_process.pop() {
             while let Some(cube_two) = current_on_cubes.pop() {
                 if cubes_intersect(&cube, &cube_two) {
-                    if is_on {
-                    } else {
-                        // This will have overlapping areas between axis
-                        // Can optimize later if needed
-                        // Not sure of the right approach at this time
-                        handle_min_range_comparison(
-                            &mut cube,
-                            &cube_two,
-                            &mut cubes_to_process,
-                            &mut modified_cubes,
-                            Axis::X,
-                        );
-                        handle_max_range_comparison(
-                            &mut cube,
-                            &cube_two,
-                            &mut cubes_to_process,
-                            &mut modified_cubes,
-                            Axis::X,
-                        );
+                    handle_min_range_comparison(
+                        &mut cube,
+                        &cube_two,
+                        &mut cubes_to_process,
+                        &mut modified_cubes,
+                        Axis::X,
+                        is_on,
+                    );
+                    handle_max_range_comparison(
+                        &mut cube,
+                        &cube_two,
+                        &mut cubes_to_process,
+                        &mut modified_cubes,
+                        Axis::X,
+                        is_on,
+                    );
 
-                        handle_min_range_comparison(
-                            &mut cube,
-                            &cube_two,
-                            &mut cubes_to_process,
-                            &mut modified_cubes,
-                            Axis::Y,
-                        );
-                        handle_max_range_comparison(
-                            &mut cube,
-                            &cube_two,
-                            &mut cubes_to_process,
-                            &mut modified_cubes,
-                            Axis::Y,
-                        );
+                    handle_min_range_comparison(
+                        &mut cube,
+                        &cube_two,
+                        &mut cubes_to_process,
+                        &mut modified_cubes,
+                        Axis::Y,
+                        is_on,
+                    );
+                    handle_max_range_comparison(
+                        &mut cube,
+                        &cube_two,
+                        &mut cubes_to_process,
+                        &mut modified_cubes,
+                        Axis::Y,
+                        is_on,
+                    );
 
-                        handle_min_range_comparison(
-                            &mut cube,
-                            &cube_two,
-                            &mut cubes_to_process,
-                            &mut modified_cubes,
-                            Axis::Z,
-                        );
-                        handle_max_range_comparison(
-                            &mut cube,
-                            &cube_two,
-                            &mut cubes_to_process,
-                            &mut modified_cubes,
-                            Axis::Z,
-                        );
-                    }
+                    handle_min_range_comparison(
+                        &mut cube,
+                        &cube_two,
+                        &mut cubes_to_process,
+                        &mut modified_cubes,
+                        Axis::Z,
+                        is_on,
+                    );
+                    handle_max_range_comparison(
+                        &mut cube,
+                        &cube_two,
+                        &mut cubes_to_process,
+                        &mut modified_cubes,
+                        Axis::Z,
+                        is_on,
+                    );
                 } else {
                     modified_cubes.push(cube_two);
                 }
             }
         }
 
-        intersected_cubes = modified_cubes;
+        current_on_cubes.append(&mut modified_cubes);
     }
 
     Ok(())
