@@ -169,30 +169,30 @@ fn handle_min_range_comparison(
 }
 
 fn handle_max_range_comparison(
-    cube: &mut Cube,
-    cube_two: &Cube,
+    cube_to_switch: &mut Cube,
+    existing_cube: &Cube,
     cubes_to_process: &mut Vec<Cube>,
     modified_cubes: &mut Vec<Cube>,
     axis: Axis,
     is_on: bool,
 ) {
     let values_to_compare = match axis {
-        Axis::X => (cube.x.1, cube_two.x.1),
-        Axis::Y => (cube.y.1, cube_two.y.1),
-        Axis::Z => (cube.z.1, cube_two.z.1),
+        Axis::X => (cube_to_switch.x.1, existing_cube.x.1),
+        Axis::Y => (cube_to_switch.y.1, existing_cube.y.1),
+        Axis::Z => (cube_to_switch.z.1, existing_cube.z.1),
     };
 
     match values_to_compare.0.cmp(&values_to_compare.1) {
         // the new cube extends past the far edge of the current
         Ordering::Greater => {
-            let mut axis_values = [cube.x, cube.y, cube.z];
+            let mut axis_values = [cube_to_switch.x, cube_to_switch.y, cube_to_switch.z];
 
             match axis {
                 Axis::X => {
-                    axis_values[0] = (cube_two.x.1 + 1, cube.x.1);
+                    axis_values[0] = (existing_cube.x.1 + 1, cube_to_switch.x.1);
                 }
-                Axis::Y => axis_values[1] = (cube_two.y.1 + 1, cube.y.1),
-                Axis::Z => axis_values[2] = (cube_two.z.1 + 1, cube.z.1),
+                Axis::Y => axis_values[1] = (existing_cube.y.1 + 1, cube_to_switch.y.1),
+                Axis::Z => axis_values[2] = (existing_cube.z.1 + 1, cube_to_switch.z.1),
             }
 
             let new_cube = Cube::new(axis_values[0], axis_values[1], axis_values[2]);
@@ -203,21 +203,21 @@ fn handle_max_range_comparison(
             }
 
             // TODO: need to update this to work with on/off, as well as whether this cube needs to go back into the list
-            cube.set_axis_value(axis, AxisSlot::Second, cube_two.get_axis(&axis).1);
+            cube_to_switch.set_axis_value(axis, AxisSlot::Second, existing_cube.get_axis(&axis).1);
         }
         // the new cube is inside the far edge of the axis
         Ordering::Less => {
-            let mut axis_values = [cube_two.x, cube_two.y, cube_two.z];
+            let mut axis_values = [existing_cube.x, existing_cube.y, existing_cube.z];
 
             match axis {
                 Axis::X => {
-                    axis_values[0] = (cube.x.1 + 1, cube_two.x.1);
+                    axis_values[0] = (cube_to_switch.x.1 + 1, existing_cube.x.1);
                 }
                 Axis::Y => {
-                    axis_values[1] = (cube.y.1 + 1, cube_two.y.1);
+                    axis_values[1] = (cube_to_switch.y.1 + 1, existing_cube.y.1);
                 }
                 Axis::Z => {
-                    axis_values[2] = (cube.z.1 + 1, cube_two.z.1);
+                    axis_values[2] = (cube_to_switch.z.1 + 1, existing_cube.z.1);
                 }
             }
 
@@ -260,20 +260,20 @@ fn main() -> Result<()> {
 
         let mut cubes_to_process = vec![Cube::new(x_range, y_range, z_range)];
 
-        while let Some(mut cube) = cubes_to_process.pop() {
-            while let Some(cube_two) = current_on_cubes.pop() {
-                if cubes_intersect(&cube, &cube_two) {
+        while let Some(mut cube_to_switch) = cubes_to_process.pop() {
+            while let Some(existing_cube) = current_on_cubes.pop() {
+                if cubes_intersect(&cube_to_switch, &existing_cube) {
                     handle_min_range_comparison(
-                        &mut cube,
-                        &cube_two,
+                        &mut cube_to_switch,
+                        &existing_cube,
                         &mut cubes_to_process,
                         &mut modified_cubes,
                         Axis::X,
                         is_on,
                     );
                     handle_max_range_comparison(
-                        &mut cube,
-                        &cube_two,
+                        &mut cube_to_switch,
+                        &existing_cube,
                         &mut cubes_to_process,
                         &mut modified_cubes,
                         Axis::X,
@@ -281,16 +281,16 @@ fn main() -> Result<()> {
                     );
 
                     handle_min_range_comparison(
-                        &mut cube,
-                        &cube_two,
+                        &mut cube_to_switch,
+                        &existing_cube,
                         &mut cubes_to_process,
                         &mut modified_cubes,
                         Axis::Y,
                         is_on,
                     );
                     handle_max_range_comparison(
-                        &mut cube,
-                        &cube_two,
+                        &mut cube_to_switch,
+                        &existing_cube,
                         &mut cubes_to_process,
                         &mut modified_cubes,
                         Axis::Y,
@@ -298,23 +298,23 @@ fn main() -> Result<()> {
                     );
 
                     handle_min_range_comparison(
-                        &mut cube,
-                        &cube_two,
+                        &mut cube_to_switch,
+                        &existing_cube,
                         &mut cubes_to_process,
                         &mut modified_cubes,
                         Axis::Z,
                         is_on,
                     );
                     handle_max_range_comparison(
-                        &mut cube,
-                        &cube_two,
+                        &mut cube_to_switch,
+                        &existing_cube,
                         &mut cubes_to_process,
                         &mut modified_cubes,
                         Axis::Z,
                         is_on,
                     );
                 } else {
-                    modified_cubes.push(cube_two);
+                    modified_cubes.push(existing_cube);
                 }
             }
         }
