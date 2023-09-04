@@ -196,11 +196,7 @@ fn handle_max_range_comparison(
             }
 
             let new_cube = Cube::new(axis_values[0], axis_values[1], axis_values[2]);
-            if is_on {
-                cubes_to_process.push(new_cube);
-            } else {
-                modified_cubes.push(new_cube);
-            }
+            cubes_to_process.push(new_cube);
 
             // TODO: need to update this to work with on/off, as well as whether this cube needs to go back into the list
             cube_to_switch.set_axis_value(axis, AxisSlot::Second, existing_cube.get_axis(&axis).1);
