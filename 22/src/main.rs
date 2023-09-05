@@ -224,6 +224,50 @@ fn handle_max_range_comparison(
     }
 }
 
+fn switch_cube_off(existing_cube: &mut Cube, cube_area_to_switch_off: &mut Cube) {
+    // extends past left bounds
+    if cube_area_to_switch_off.x.0 < existing_cube.x.0 {
+    }
+    // extends within the left bounds
+    else if cube_area_to_switch_off.x.0 >= existing_cube.x.0 {
+    }
+
+    // extends past right bounds
+    if cube_area_to_switch_off.x.1 > existing_cube.x.1 {
+    }
+    // extends within the right bounds
+    else if cube_area_to_switch_off.x.1 <= existing_cube.x.1 {
+    }
+
+    // extends above top bounds
+    if cube_area_to_switch_off.y.0 < existing_cube.y.0 {
+    }
+    // extends below the top bounds
+    else if cube_area_to_switch_off.y.0 >= existing_cube.x.0 {
+    }
+
+    // extends below bottom bounds
+    if cube_area_to_switch_off.y.1 > existing_cube.y.1 {
+    }
+    // extends above the top bounds
+    else if cube_area_to_switch_off.y.1 <= existing_cube.x.1 {
+    }
+
+    // extends in front of forward bounds
+    if cube_area_to_switch_off.z.0 < existing_cube.z.0 {
+    }
+    // extends behind the front bounds
+    else if cube_area_to_switch_off.z.0 >= existing_cube.z.0 {
+    }
+
+    // extends behind back bounds
+    if cube_area_to_switch_off.z.1 > existing_cube.z.1 {
+    }
+    // extends in front of the back bounds
+    else if cube_area_to_switch_off.z.1 <= existing_cube.z.1 {
+    }
+}
+
 fn main() -> Result<()> {
     let text = read_text("22/input.txt")?;
 
