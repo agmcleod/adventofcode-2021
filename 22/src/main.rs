@@ -4,7 +4,7 @@ use std::ops::RangeInclusive;
 
 use read_input::read_text;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Cube {
     x: RangeInclusive<i32>,
     y: RangeInclusive<i32>,
@@ -96,6 +96,12 @@ impl Cube {
             .filter(|c| !c.is_empty())
             .collect()
         }
+    }
+}
+
+impl PartialEq for Cube {
+    fn eq(&self, other: &Self) -> bool {
+        self.x == other.x && self.y == other.y && self.z == other.z
     }
 }
 
@@ -232,4 +238,25 @@ fn main() -> Result<()> {
     );
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cube_subtraction() {
+        let cube_one = Cube::new(1..=10, 1..=10, 1..=10);
+        let cube_two = Cube::new(2..=9, 2..=9, 2..=9);
+
+        let cubes = cube_one.subtract(&cube_two);
+
+        assert_eq!(cubes.len(), 6);
+        assert_eq!(cubes[0], Cube::new(1..=1, 1..=10, 1..=10));
+        assert_eq!(cubes[1], Cube::new(10..=10, 1..=10, 1..=10));
+        assert_eq!(cubes[2], Cube::new(2..=9, 1..=1, 1..=10));
+        assert_eq!(cubes[3], Cube::new(2..=9, 10..=10, 1..=10));
+        assert_eq!(cubes[4], Cube::new(2..=9, 2..=9, 1..=1));
+        assert_eq!(cubes[5], Cube::new(2..=9, 2..=9, 10..=10));
+    }
 }
