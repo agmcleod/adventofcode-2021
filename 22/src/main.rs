@@ -1,17 +1,22 @@
-use std::cmp::Ordering;
-use std::collections::HashSet;
-use std::{fmt::Display, io::Result};
+use std::fmt::Display;
+use std::io::Result;
+use std::ops::RangeInclusive;
 
 use read_input::read_text;
 
+#[derive(Clone)]
 struct Cube {
-    x: (i32, i32),
-    y: (i32, i32),
-    z: (i32, i32),
+    x: RangeInclusive<i32>,
+    y: RangeInclusive<i32>,
+    z: RangeInclusive<i32>,
 }
 
 impl Cube {
-    fn new(x_range: (i32, i32), y_range: (i32, i32), z_range: (i32, i32)) -> Self {
+    fn new(
+        x_range: RangeInclusive<i32>,
+        y_range: RangeInclusive<i32>,
+        z_range: RangeInclusive<i32>,
+    ) -> Self {
         Cube {
             x: x_range,
             y: y_range,
@@ -19,42 +24,85 @@ impl Cube {
         }
     }
 
-    fn get_axis(&self, axis: &Axis) -> (i32, i32) {
-        match axis {
-            Axis::X => self.x,
-            Axis::Y => self.y,
-            Axis::Z => self.z,
-        }
+    fn is_empty(&self) -> bool {
+        self.x.is_empty() || self.y.is_empty() || self.z.is_empty()
     }
 
-    fn set_axis_value(&mut self, axis: Axis, axis_slot: AxisSlot, value: i32) {
-        let axis_values = match axis {
-            Axis::X => &mut self.x,
-            Axis::Y => &mut self.y,
-            Axis::Z => &mut self.z,
-        };
+    fn volume(&self) -> usize {
+        self.x.to_owned().count() * self.y.to_owned().count() * self.z.to_owned().count()
+    }
 
-        match axis_slot {
-            AxisSlot::First => {
-                axis_values.0 = value;
-            }
-            AxisSlot::Second => {
-                axis_values.1 = value;
-            }
+    fn x_min(&self) -> i32 {
+        self.x.start().to_owned()
+    }
+
+    fn x_max(&self) -> i32 {
+        self.x.end().to_owned()
+    }
+
+    fn y_min(&self) -> i32 {
+        self.y.start().to_owned()
+    }
+
+    fn y_max(&self) -> i32 {
+        self.y.end().to_owned()
+    }
+
+    fn z_min(&self) -> i32 {
+        self.z.start().to_owned()
+    }
+
+    fn z_max(&self) -> i32 {
+        self.z.end().to_owned()
+    }
+
+    fn subtract(&self, other: &Cube) -> Vec<Cube> {
+        if !cubes_intersect(self, other) {
+            vec![self.to_owned()]
+        } else {
+            [
+                Cube::new(
+                    self.x_min()..=other.x_min() - 1,
+                    self.y.clone(),
+                    self.z.clone(),
+                ),
+                Cube::new(
+                    other.x_max() + 1..=self.x_max(),
+                    self.y.clone(),
+                    self.z.clone(),
+                ),
+                Cube::new(
+                    self.x_min().max(other.x_min())..=self.x_max().min(other.x_max()),
+                    self.y_min()..=other.y_min() - 1,
+                    self.z.clone(),
+                ),
+                Cube::new(
+                    self.x_min().max(other.x_min())..=self.x_max().min(other.x_max()),
+                    other.y_max() + 1..=self.y_max(),
+                    self.z.clone(),
+                ),
+                Cube::new(
+                    self.x_min().max(other.x_min())..=self.x_max().min(other.x_max()),
+                    self.y_min().max(other.y_min())..=self.y_max().min(other.y_max()),
+                    self.z_min()..=other.z_min() - 1,
+                ),
+                Cube::new(
+                    self.x_min().max(other.x_min())..=self.x_max().min(other.x_max()),
+                    self.y_min().max(other.y_min())..=self.y_max().min(other.y_max()),
+                    other.z_max() + 1..=self.z_max(),
+                ),
+            ]
+            .into_iter()
+            .filter(|c| !c.is_empty())
+            .collect()
         }
     }
 }
 
-#[derive(Copy, Clone)]
 enum Axis {
     X,
     Y,
     Z,
-}
-
-enum AxisSlot {
-    First,
-    Second,
 }
 
 impl Display for Axis {
@@ -68,7 +116,7 @@ impl Display for Axis {
     }
 }
 
-fn get_range(segment: Option<&str>, line: &String, axis: Axis) -> (i32, i32) {
+fn get_range(segment: Option<&str>, line: &String, axis: Axis) -> RangeInclusive<i32> {
     let axis_str = format!("{}=", axis);
     if let Some(segment) = segment {
         if segment.starts_with(&axis_str) {
@@ -82,7 +130,7 @@ fn get_range(segment: Option<&str>, line: &String, axis: Axis) -> (i32, i32) {
                 panic!("Range not the expected values {:?}", range);
             }
 
-            (range[0], range[1])
+            range[0]..=range[1]
         } else {
             panic!("Segment does not have {}=. was: {}", axis, segment);
         }
@@ -92,180 +140,17 @@ fn get_range(segment: Option<&str>, line: &String, axis: Axis) -> (i32, i32) {
 }
 
 fn cubes_intersect(cube_one: &Cube, cube_two: &Cube) -> bool {
-    if cube_one.x.0 <= cube_two.x.1
-        && cube_one.x.1 >= cube_two.x.0
-        && cube_one.y.0 <= cube_two.y.1
-        && cube_one.y.1 >= cube_two.y.0
-        && cube_one.z.0 <= cube_two.z.1
-        && cube_one.z.1 >= cube_two.z.0
+    if cube_one.x_min() <= cube_two.x_max()
+        && cube_one.x_max() >= cube_two.x_min()
+        && cube_one.y_min() <= cube_two.y_max()
+        && cube_one.y_max() >= cube_two.y_min()
+        && cube_one.z_min() <= cube_two.z_max()
+        && cube_one.z_max() >= cube_two.z_min()
     {
         return true;
     }
 
     false
-}
-
-fn handle_min_range_comparison(
-    cube: &mut Cube,
-    cube_two: &Cube,
-    cubes_to_process: &mut Vec<Cube>,
-    modified_cubes: &mut Vec<Cube>,
-    axis: Axis,
-    is_on: bool,
-) {
-    let values_to_compare = match axis {
-        Axis::X => (cube.x.0, cube_two.x.0),
-        Axis::Y => (cube.y.0, cube_two.y.0),
-        Axis::Z => (cube.z.0, cube_two.z.0),
-    };
-
-    match values_to_compare.0.cmp(&values_to_compare.1) {
-        // the new cube extends outside of the axis
-        Ordering::Less => {
-            let mut axis_values = [cube.x, cube.y, cube.z];
-
-            match axis {
-                Axis::X => {
-                    axis_values[0] = (cube.x.0, cube_two.x.0 - 1);
-                }
-                Axis::Y => {
-                    axis_values[1] = (cube.y.0, cube_two.y.0 - 1);
-                }
-                Axis::Z => {
-                    axis_values[2] = (cube.z.0, cube_two.z.0 - 1);
-                }
-            }
-
-            let new_cube = Cube::new(axis_values[0], axis_values[1], axis_values[2]);
-            if is_on {
-                modified_cubes.push(new_cube);
-            } else {
-                cubes_to_process.push(new_cube);
-            }
-            cube.set_axis_value(axis, AxisSlot::First, cube_two.get_axis(&axis).0);
-        }
-        // the new cube is inside of the axis
-        Ordering::Greater => {
-            let mut axis_values = [cube_two.x, cube_two.y, cube_two.z];
-
-            match axis {
-                Axis::X => {
-                    axis_values[0] = (cube_two.x.0, cube.x.0 - 1);
-                }
-                Axis::Y => {
-                    axis_values[1] = (cube_two.y.0, cube.y.0 - 1);
-                }
-                Axis::Z => {
-                    axis_values[2] = (cube_two.z.0, cube.z.0 - 1);
-                }
-            }
-
-            modified_cubes.push(Cube::new(axis_values[0], axis_values[1], axis_values[2]));
-
-            // TODO: need to remove the inside cube now
-        }
-        _ => {}
-    }
-}
-
-fn handle_max_range_comparison(
-    cube_to_switch: &mut Cube,
-    existing_cube: &Cube,
-    cubes_to_process: &mut Vec<Cube>,
-    modified_cubes: &mut Vec<Cube>,
-    axis: Axis,
-    is_on: bool,
-) {
-    let values_to_compare = match axis {
-        Axis::X => (cube_to_switch.x.1, existing_cube.x.1),
-        Axis::Y => (cube_to_switch.y.1, existing_cube.y.1),
-        Axis::Z => (cube_to_switch.z.1, existing_cube.z.1),
-    };
-
-    match values_to_compare.0.cmp(&values_to_compare.1) {
-        // the new cube extends past the far edge of the current
-        Ordering::Greater => {
-            let mut axis_values = [cube_to_switch.x, cube_to_switch.y, cube_to_switch.z];
-
-            match axis {
-                Axis::X => {
-                    axis_values[0] = (existing_cube.x.1 + 1, cube_to_switch.x.1);
-                }
-                Axis::Y => axis_values[1] = (existing_cube.y.1 + 1, cube_to_switch.y.1),
-                Axis::Z => axis_values[2] = (existing_cube.z.1 + 1, cube_to_switch.z.1),
-            }
-
-            let new_cube = Cube::new(axis_values[0], axis_values[1], axis_values[2]);
-            cubes_to_process.push(new_cube);
-
-            // TODO: need to update this to work with on/off, as well as whether this cube needs to go back into the list
-            cube_to_switch.set_axis_value(axis, AxisSlot::Second, existing_cube.get_axis(&axis).1);
-        }
-        // the new cube is inside the far edge of the axis
-        Ordering::Less => {
-            let mut axis_values = [existing_cube.x, existing_cube.y, existing_cube.z];
-
-            match axis {
-                Axis::X => {
-                    axis_values[0] = (cube_to_switch.x.1 + 1, existing_cube.x.1);
-                }
-                Axis::Y => {
-                    axis_values[1] = (cube_to_switch.y.1 + 1, existing_cube.y.1);
-                }
-                Axis::Z => {
-                    axis_values[2] = (cube_to_switch.z.1 + 1, existing_cube.z.1);
-                }
-            }
-
-            let new_cube = Cube::new(axis_values[0], axis_values[1], axis_values[2]);
-            modified_cubes.push(new_cube);
-        }
-        _ => {}
-    }
-}
-
-fn switch_cube_off(existing_cube: &mut Cube, cube_area_to_switch_off: &mut Cube) {
-    // extends past left bounds
-    if cube_area_to_switch_off.x.0 < existing_cube.x.0 {
-    }
-    // extends within the left bounds
-    else if cube_area_to_switch_off.x.0 >= existing_cube.x.0 {
-    }
-
-    // extends past right bounds
-    if cube_area_to_switch_off.x.1 > existing_cube.x.1 {
-    }
-    // extends within the right bounds
-    else if cube_area_to_switch_off.x.1 <= existing_cube.x.1 {
-    }
-
-    // extends above top bounds
-    if cube_area_to_switch_off.y.0 < existing_cube.y.0 {
-    }
-    // extends below the top bounds
-    else if cube_area_to_switch_off.y.0 >= existing_cube.x.0 {
-    }
-
-    // extends below bottom bounds
-    if cube_area_to_switch_off.y.1 > existing_cube.y.1 {
-    }
-    // extends above the top bounds
-    else if cube_area_to_switch_off.y.1 <= existing_cube.x.1 {
-    }
-
-    // extends in front of forward bounds
-    if cube_area_to_switch_off.z.0 < existing_cube.z.0 {
-    }
-    // extends behind the front bounds
-    else if cube_area_to_switch_off.z.0 >= existing_cube.z.0 {
-    }
-
-    // extends behind back bounds
-    if cube_area_to_switch_off.z.1 > existing_cube.z.1 {
-    }
-    // extends in front of the back bounds
-    else if cube_area_to_switch_off.z.1 <= existing_cube.z.1 {
-    }
 }
 
 fn main() -> Result<()> {
@@ -296,71 +181,55 @@ fn main() -> Result<()> {
         let segment = iter.next();
         let z_range = get_range(segment, &line_copy, Axis::Z);
 
-        let mut modified_cubes = Vec::new();
-
         let mut cubes_to_process = vec![Cube::new(x_range, y_range, z_range)];
 
-        while let Some(mut cube_to_switch) = cubes_to_process.pop() {
-            while let Some(existing_cube) = current_on_cubes.pop() {
-                if cubes_intersect(&cube_to_switch, &existing_cube) {
-                    handle_min_range_comparison(
-                        &mut cube_to_switch,
-                        &existing_cube,
-                        &mut cubes_to_process,
-                        &mut modified_cubes,
-                        Axis::X,
-                        is_on,
-                    );
-                    handle_max_range_comparison(
-                        &mut cube_to_switch,
-                        &existing_cube,
-                        &mut cubes_to_process,
-                        &mut modified_cubes,
-                        Axis::X,
-                        is_on,
-                    );
+        while let Some(cube_to_switch) = cubes_to_process.pop() {
+            if is_on {
+                let mut modified_cubes = vec![cube_to_switch];
 
-                    handle_min_range_comparison(
-                        &mut cube_to_switch,
-                        &existing_cube,
-                        &mut cubes_to_process,
-                        &mut modified_cubes,
-                        Axis::Y,
-                        is_on,
-                    );
-                    handle_max_range_comparison(
-                        &mut cube_to_switch,
-                        &existing_cube,
-                        &mut cubes_to_process,
-                        &mut modified_cubes,
-                        Axis::Y,
-                        is_on,
-                    );
-
-                    handle_min_range_comparison(
-                        &mut cube_to_switch,
-                        &existing_cube,
-                        &mut cubes_to_process,
-                        &mut modified_cubes,
-                        Axis::Z,
-                        is_on,
-                    );
-                    handle_max_range_comparison(
-                        &mut cube_to_switch,
-                        &existing_cube,
-                        &mut cubes_to_process,
-                        &mut modified_cubes,
-                        Axis::Z,
-                        is_on,
-                    );
-                } else {
-                    modified_cubes.push(existing_cube);
+                for existing_cube in &current_on_cubes {
+                    let mut new_modified_cubes = Vec::new();
+                    for cube in &modified_cubes {
+                        new_modified_cubes.extend(cube.subtract(existing_cube));
+                    }
+                    modified_cubes = new_modified_cubes;
                 }
+
+                current_on_cubes.extend(modified_cubes);
+            } else {
+                let mut modified_cubes = Vec::new();
+                while let Some(existing_cube) = current_on_cubes.pop() {
+                    modified_cubes.extend(existing_cube.subtract(&cube_to_switch));
+                }
+
+                current_on_cubes = modified_cubes;
             }
         }
-
-        current_on_cubes.append(&mut modified_cubes);
     }
+
+    println!(
+        "{}",
+        current_on_cubes
+            .iter()
+            // limit by p1 range
+            .map(|cube| {
+                Cube::new(
+                    cube.x_min().max(-50)..=cube.x_max().min(50),
+                    cube.y_min().max(-50)..=cube.y_max().min(50),
+                    cube.z_min().max(-50)..=cube.z_max().min(50),
+                )
+            })
+            .map(|cube| cube.volume())
+            .sum::<usize>()
+    );
+
+    println!(
+        "{}",
+        current_on_cubes
+            .iter()
+            .map(|cube| cube.volume())
+            .sum::<usize>()
+    );
 
     Ok(())
 }
