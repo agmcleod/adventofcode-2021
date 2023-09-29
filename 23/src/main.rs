@@ -1,7 +1,6 @@
-use std::collections::{hash_map, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::io::Result;
-use std::iter;
 
 use read_input::read_text;
 
@@ -59,8 +58,8 @@ impl Display for Tile {
             match self {
                 Tile::A => "A",
                 Tile::B => "B",
-                Tile::C => "D",
-                Tile::D => "E",
+                Tile::C => "C",
+                Tile::D => "D",
                 Tile::Empty => ".",
             }
         )
@@ -90,12 +89,29 @@ impl State {
     fn get_nonsolved_tiles(&self) -> impl Iterator<Item = (&(usize, usize), &Tile)> {
         self.map
             .iter()
-            .filter(|(_, tile)| **tile != Tile::Empty && self.locations_solved.contains(*tile))
+            .filter(|(_, tile)| **tile != Tile::Empty && !self.locations_solved.contains(*tile))
+    }
+}
+
+impl Display for State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for r in 0..=self.height {
+            for c in 0..=self.width {
+                if let Some(location) = self.map.get(&(c, r)) {
+                    write!(f, "{}", location)?;
+                } else {
+                    write!(f, " ")?;
+                }
+            }
+            writeln!(f)?;
+        }
+
+        Ok(())
     }
 }
 
 fn manhatten_distance(coord1: &(usize, usize), coord2: &(usize, usize)) -> usize {
-    coord1.0 + coord1.1 + coord2.0 + coord2.1
+    ((coord1.0 + coord1.1) as i32 - (coord2.0 + coord2.1) as i32).unsigned_abs() as usize
 }
 
 fn move_ampiphod_out_of_slot(
@@ -105,21 +121,22 @@ fn move_ampiphod_out_of_slot(
     number_of_moves: usize,
     total_energy_cost: &mut usize,
 ) {
-    state.energy += tile.get_energy_cost() * number_of_moves;
     // move the current letter out
     state.map.insert(*coord, Tile::Empty);
     let mut second_state = state.clone();
 
     // move up and then left
-    let up_left_coord = (coord.0 - 1, coord.1 - 1);
+    let up_left_coord = (coord.0 - 1, coord.1 - (number_of_moves - 1));
     if *state.map.get(&up_left_coord).unwrap() == Tile::Empty {
+        state.energy += tile.get_energy_cost() * number_of_moves;
         state.map.insert((coord.0 - 1, coord.1 - 1), tile.clone());
         *total_energy_cost = (*total_energy_cost).min(next_moves(state));
     }
 
     // move up and then right
-    let up_right_coord = (coord.0 + 1, coord.1 - 1);
+    let up_right_coord = (coord.0 + 1, coord.1 - (number_of_moves - 1));
     if *second_state.map.get(&up_right_coord).unwrap() == Tile::Empty {
+        second_state.energy += tile.get_energy_cost() * number_of_moves;
         second_state.map.insert(up_right_coord, tile.clone());
         *total_energy_cost = (*total_energy_cost).min(next_moves(second_state));
     }
@@ -164,44 +181,48 @@ fn next_moves(state: State) -> usize {
             // y coord is 1, so is out of slot
             let first_tile = state.map.get(&target_coords[1]).unwrap();
             let second_tile = state.map.get(&target_coords[1]).unwrap();
-            // TODO: check if there's other letters on coord.1 in the way
-            // both empty, can move into bottom spot
-            if *first_tile == Tile::Empty && *second_tile == Tile::Empty {
-                let mut state = state.clone();
-                state.map.insert(*coord, Tile::Empty);
-                state.energy +=
-                    tile.get_energy_cost() * manhatten_distance(coord, &target_coords[1]);
-                energy_cost = energy_cost.min(next_moves(state));
-            } else if *first_tile == Tile::Empty && *second_tile == *tile {
-                // top spot is empty, and bottom spot has the same tile value as our current letter
-                let mut state = state.clone();
-                state.map.insert(*coord, Tile::Empty);
-                state.energy +=
-                    tile.get_energy_cost() * manhatten_distance(coord, &target_coords[0]);
-                state.locations_solved.insert(tile.clone());
-                energy_cost = energy_cost.min(next_moves(state));
+            let can_move_into_bottom_spot =
+                *first_tile == Tile::Empty && *second_tile == Tile::Empty;
+            let can_move_into_top_spot = *first_tile == Tile::Empty && *second_tile == *tile;
+
+            let mut ampiphods_in_the_way = false;
+            if can_move_into_bottom_spot || can_move_into_top_spot {
+                let min_x = coord.0.min(target_coords[0].0);
+                let max_x = coord.0.max(target_coords[0].0);
+
+                for x in (min_x + 1)..max_x {
+                    if *state.map.get(&(x, coord.1)).unwrap() != Tile::Empty {
+                        ampiphods_in_the_way = true;
+                    }
+                }
+            }
+
+            if !ampiphods_in_the_way {
+                // both empty, can move into bottom spot
+                if can_move_into_bottom_spot {
+                    let mut state = state.clone();
+                    state.map.insert(*coord, Tile::Empty);
+                    state.energy +=
+                        tile.get_energy_cost() * manhatten_distance(coord, &target_coords[1]);
+                    state.map.insert(target_coords[1], tile.clone());
+                    // println!("Moving into bottom {} {}", tile, state);
+                    energy_cost = energy_cost.min(next_moves(state));
+                } else if can_move_into_top_spot {
+                    // top spot is empty, and bottom spot has the same tile value as our current letter
+                    let mut state = state.clone();
+                    state.map.insert(*coord, Tile::Empty);
+                    state.energy +=
+                        tile.get_energy_cost() * manhatten_distance(coord, &target_coords[0]);
+                    state.locations_solved.insert(tile.clone());
+                    state.map.insert(target_coords[0], tile.clone());
+                    // println!("Moving into top {} {}", tile, state);
+                    energy_cost = energy_cost.min(next_moves(state));
+                }
             }
         }
     }
 
     energy_cost
-}
-
-impl Display for State {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for r in 0..=self.height {
-            for c in 0..=self.width {
-                if let Some(location) = self.map.get(&(c, r)) {
-                    write!(f, "{}", location)?;
-                } else {
-                    write!(f, " ")?;
-                }
-            }
-            writeln!(f)?;
-        }
-
-        Ok(())
-    }
 }
 
 fn main() -> Result<()> {
@@ -228,4 +249,16 @@ fn main() -> Result<()> {
     println!("{}", next_moves(state));
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_manhatten_distance() {
+        assert_eq!(manhatten_distance(&(1, 1), &(1, 2)), 1);
+        assert_eq!(manhatten_distance(&(1, 1), &(2, 2)), 2);
+        assert_eq!(manhatten_distance(&(1, 1), &(6, 2)), 6);
+        assert_eq!(manhatten_distance(&(6, 2), &(1, 1)), 6);
+    }
 }
