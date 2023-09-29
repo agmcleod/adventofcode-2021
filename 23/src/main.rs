@@ -167,8 +167,14 @@ fn next_moves(state: State) -> usize {
         let target_coords = tile.get_target_coords();
         // letter is in the bottom of desired spot
         if *coord == target_coords[1] {
+            // if letter in top spot also matches, mark this one as complete
+            if state.map.get(&target_coords[0]).unwrap() == tile {
+                let mut state = state.clone();
+                state.locations_solved.insert(tile.clone());
+                next_moves(state);
+            }
             continue;
-        } else if (*coord == target_coords[0] && state.map.get(&target_coords[0]).unwrap() != tile)
+        } else if (*coord == target_coords[0] && state.map.get(&target_coords[1]).unwrap() != tile)
             || coord.1 == 2
         {
             // letter is in desired top spot, but has a different letter below, or it is in top spot and needs to be elsewhere
