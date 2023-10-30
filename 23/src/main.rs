@@ -6,12 +6,6 @@ use read_input::read_text;
 
 type Coord = (i32, i32);
 type Map = HashMap<Coord, Tile>;
-type StateMapKey = (
-    (Tile, Coord, Coord),
-    (Tile, Coord, Coord),
-    (Tile, Coord, Coord),
-    (Tile, Coord, Coord),
-);
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 enum Tile {
@@ -82,7 +76,6 @@ struct State {
     width: usize,
     height: usize,
     locations_solved: HashSet<Tile>,
-    previous_states: HashSet<StateMapKey>,
 }
 
 impl State {
@@ -94,20 +87,14 @@ impl State {
             width,
             height,
             locations_solved: HashSet::new(),
-            previous_states: HashSet::new(),
         }
     }
 
     fn create_next(&self) -> Self {
         let mut next = self.clone();
         next.old_state = Some(Box::new(self.clone()));
-        next.add_self_to_previous_states();
 
         next
-    }
-
-    fn add_self_to_previous_states(&mut self) {
-        self.previous_states.insert(self.get_state_key());
     }
 
     fn get_nonsolved_tiles(&self) -> impl Iterator<Item = (&Coord, &Tile)> {
@@ -125,28 +112,6 @@ impl State {
                 *self.map.get(coord).unwrap() == Tile::Empty && self.path_is_clear(from, coord)
             })
             .cloned()
-            .collect()
-    }
-
-    fn get_state_key(&self) -> StateMapKey {
-        let a_tiles = self.get_coords_for_tile(Tile::A);
-        let b_tiles = self.get_coords_for_tile(Tile::B);
-        let c_tiles = self.get_coords_for_tile(Tile::C);
-        let d_tiles = self.get_coords_for_tile(Tile::D);
-
-        (
-            (Tile::A, a_tiles[0], a_tiles[1]),
-            (Tile::B, b_tiles[0], b_tiles[1]),
-            (Tile::C, c_tiles[0], c_tiles[1]),
-            (Tile::D, d_tiles[0], d_tiles[1]),
-        )
-    }
-
-    fn get_coords_for_tile(&self, tile: Tile) -> Vec<Coord> {
-        self.map
-            .iter()
-            .filter(|(_, t)| **t == tile)
-            .map(|(coord, _)| coord.to_owned())
             .collect()
     }
 
@@ -204,12 +169,10 @@ fn manhatten_distance(coord1: &Coord, coord2: &Coord) -> i32 {
     (coord1.0 - coord2.0).unsigned_abs() as i32 + (coord1.1 - coord2.1).unsigned_abs() as i32
 }
 
-fn next_moves(state: State) -> usize {
-    // we exit this state as we've handled it before return max score so this count isnt considered
-    if state.previous_states.contains(&state.get_state_key()) {
-        return usize::MAX;
+fn next_moves(state: State, current_best_score: &mut usize) {
+    if state.energy > *current_best_score {
+        return;
     }
-
     if state.locations_solved.len() == 4 {
         // if state.energy == 4281 {
         //     let mut old_state = state.old_state.as_ref();
@@ -220,10 +183,9 @@ fn next_moves(state: State) -> usize {
         //         old_state = old_state.as_ref().unwrap().old_state.as_ref();
         //     }
         // }
-        return state.energy;
+        *current_best_score = (*current_best_score).min(state.energy);
+        return;
     }
-
-    let mut energy_cost = usize::MAX;
 
     for (coord, tile) in state.get_nonsolved_tiles() {
         let target_coords = tile.get_target_coords();
@@ -233,7 +195,7 @@ fn next_moves(state: State) -> usize {
             if state.map.get(&target_coords[0]).unwrap() == tile {
                 let mut state = state.create_next();
                 state.locations_solved.insert(tile.clone());
-                energy_cost = energy_cost.min(next_moves(state));
+                next_moves(state, current_best_score);
             }
             continue;
         } else if (*coord == target_coords[0] && state.map.get(&target_coords[1]).unwrap() != tile)
@@ -248,7 +210,7 @@ fn next_moves(state: State) -> usize {
                 state.map.insert(*to_coord, tile.clone());
                 state.energy +=
                     (tile.get_energy_cost() * manhatten_distance(coord, to_coord)) as usize;
-                energy_cost = energy_cost.min(next_moves(state));
+                next_moves(state, current_best_score);
             }
         } else if coord.1 == 1 {
             // y coord is 1, so is out of slot
@@ -271,7 +233,7 @@ fn next_moves(state: State) -> usize {
                         as usize;
                     state.map.insert(target_coords[1], tile.clone());
                     // println!("Moving into bottom {} {}", tile, state);
-                    energy_cost = energy_cost.min(next_moves(state));
+                    next_moves(state, current_best_score);
                 } else if can_move_into_top_spot {
                     // top spot is empty, and bottom spot has the same tile value as our current letter
                     let mut state = state.create_next();
@@ -282,13 +244,11 @@ fn next_moves(state: State) -> usize {
                     state.locations_solved.insert(tile.clone());
                     state.map.insert(target_coords[0], tile.clone());
                     // println!("Moving into top {} {}", tile, state);
-                    energy_cost = energy_cost.min(next_moves(state));
+                    next_moves(state, current_best_score);
                 }
             }
         }
     }
-
-    energy_cost
 }
 
 fn main() -> Result<()> {
@@ -312,7 +272,9 @@ fn main() -> Result<()> {
     }
 
     let state = State::new(map, width, height);
-    println!("{}", next_moves(state));
+    let mut current_best_score = usize::MAX;
+    next_moves(state, &mut current_best_score);
+    println!("{}", current_best_score);
 
     Ok(())
 }
