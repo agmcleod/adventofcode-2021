@@ -6,6 +6,13 @@ use read_input::read_text;
 
 type Coord = (i32, i32);
 type Map = HashMap<Coord, Tile>;
+type StateMapKey = (
+    (Tile, Coord, Coord),
+    (Tile, Coord, Coord),
+    (Tile, Coord, Coord),
+    (Tile, Coord, Coord),
+);
+
 #[derive(Clone, Eq, Hash, PartialEq)]
 enum Tile {
     Empty,
@@ -68,12 +75,14 @@ impl Display for Tile {
 
 #[derive(Clone)]
 struct State {
+    // mostly used for debugging
     old_state: Option<Box<State>>,
     energy: usize,
     map: Map,
     width: usize,
     height: usize,
     locations_solved: HashSet<Tile>,
+    previous_states: HashSet<StateMapKey>,
 }
 
 impl State {
@@ -85,7 +94,20 @@ impl State {
             width,
             height,
             locations_solved: HashSet::new(),
+            previous_states: HashSet::new(),
         }
+    }
+
+    fn create_next(&self) -> Self {
+        let mut next = self.clone();
+        next.old_state = Some(Box::new(self.clone()));
+        next.add_self_to_previous_states();
+
+        next
+    }
+
+    fn add_self_to_previous_states(&mut self) {
+        self.previous_states.insert(self.get_state_key());
     }
 
     fn get_nonsolved_tiles(&self) -> impl Iterator<Item = (&Coord, &Tile)> {
@@ -103,6 +125,28 @@ impl State {
                 *self.map.get(coord).unwrap() == Tile::Empty && self.path_is_clear(from, coord)
             })
             .cloned()
+            .collect()
+    }
+
+    fn get_state_key(&self) -> StateMapKey {
+        let a_tiles = self.get_coords_for_tile(Tile::A);
+        let b_tiles = self.get_coords_for_tile(Tile::B);
+        let c_tiles = self.get_coords_for_tile(Tile::C);
+        let d_tiles = self.get_coords_for_tile(Tile::D);
+
+        (
+            (Tile::A, a_tiles[0], a_tiles[1]),
+            (Tile::B, b_tiles[0], b_tiles[1]),
+            (Tile::C, c_tiles[0], c_tiles[1]),
+            (Tile::D, d_tiles[0], d_tiles[1]),
+        )
+    }
+
+    fn get_coords_for_tile(&self, tile: Tile) -> Vec<Coord> {
+        self.map
+            .iter()
+            .filter(|(_, t)| **t == tile)
+            .map(|(coord, _)| coord.to_owned())
             .collect()
     }
 
@@ -161,6 +205,11 @@ fn manhatten_distance(coord1: &Coord, coord2: &Coord) -> i32 {
 }
 
 fn next_moves(state: State) -> usize {
+    // we exit this state as we've handled it before return max score so this count isnt considered
+    if state.previous_states.contains(&state.get_state_key()) {
+        return usize::MAX;
+    }
+
     if state.locations_solved.len() == 4 {
         // if state.energy == 4281 {
         //     let mut old_state = state.old_state.as_ref();
@@ -182,8 +231,7 @@ fn next_moves(state: State) -> usize {
         if *coord == target_coords[1] {
             // if letter in top spot also matches, mark this one as complete
             if state.map.get(&target_coords[0]).unwrap() == tile {
-                let mut state = state.clone();
-                state.old_state = Some(Box::new(state.clone()));
+                let mut state = state.create_next();
                 state.locations_solved.insert(tile.clone());
                 energy_cost = energy_cost.min(next_moves(state));
             }
@@ -195,8 +243,7 @@ fn next_moves(state: State) -> usize {
             // letter is right spot but needs to move out so the letter below it can move
             // OR its in the wrong slot and needs to move out
             for to_coord in &state.get_possible_hallway_tiles(coord) {
-                let mut state = state.clone();
-                state.old_state = Some(Box::new(state.clone()));
+                let mut state = state.create_next();
                 state.map.insert(*coord, Tile::Empty);
                 state.map.insert(*to_coord, tile.clone());
                 state.energy +=
@@ -217,8 +264,7 @@ fn next_moves(state: State) -> usize {
             {
                 // both empty, can move into bottom spot
                 if can_move_into_bottom_spot {
-                    let mut state = state.clone();
-                    state.old_state = Some(Box::new(state.clone()));
+                    let mut state = state.create_next();
                     state.map.insert(*coord, Tile::Empty);
                     state.energy += (tile.get_energy_cost()
                         * manhatten_distance(coord, &target_coords[1]))
@@ -228,8 +274,7 @@ fn next_moves(state: State) -> usize {
                     energy_cost = energy_cost.min(next_moves(state));
                 } else if can_move_into_top_spot {
                     // top spot is empty, and bottom spot has the same tile value as our current letter
-                    let mut state = state.clone();
-                    state.old_state = Some(Box::new(state.clone()));
+                    let mut state = state.create_next();
                     state.map.insert(*coord, Tile::Empty);
                     state.energy += (tile.get_energy_cost()
                         * manhatten_distance(coord, &target_coords[0]))
