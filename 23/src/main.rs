@@ -17,12 +17,12 @@ enum Tile {
 }
 
 impl Tile {
-    fn get_target_coords(&self) -> [Coord; 2] {
+    fn get_target_coords(&self) -> [Coord; 4] {
         match *self {
-            Tile::A => [(3, 2), (3, 3)],
-            Tile::B => [(5, 2), (5, 3)],
-            Tile::C => [(7, 2), (7, 3)],
-            Tile::D => [(9, 2), (9, 3)],
+            Tile::A => [(3, 2), (3, 3), (3, 4), (3, 5)],
+            Tile::B => [(5, 2), (5, 3), (5, 4), (5, 5)],
+            Tile::C => [(7, 2), (7, 3), (7, 4), (7, 5)],
+            Tile::D => [(9, 2), (9, 3), (9, 4), (9, 5)],
             _ => panic!("Invalid location empty"),
         }
     }
@@ -169,83 +169,115 @@ fn manhatten_distance(coord1: &Coord, coord2: &Coord) -> i32 {
     (coord1.0 - coord2.0).unsigned_abs() as i32 + (coord1.1 - coord2.1).unsigned_abs() as i32
 }
 
+fn move_letter_out_of_way(
+    state: &State,
+    coord: &Coord,
+    tile: &Tile,
+    current_best_score: &mut usize,
+) {
+    for to_coord in &state.get_possible_hallway_tiles(coord) {
+        let mut state = state.create_next();
+        state.map.insert(*coord, Tile::Empty);
+        state.map.insert(*to_coord, tile.clone());
+        state.energy += (tile.get_energy_cost() * manhatten_distance(coord, to_coord)) as usize;
+        next_moves(state, current_best_score);
+    }
+}
+
 fn next_moves(state: State, current_best_score: &mut usize) {
     if state.energy > *current_best_score {
         return;
     }
     if state.locations_solved.len() == 4 {
-        // if state.energy == 4281 {
-        //     let mut old_state = state.old_state.as_ref();
-        //     println!("printing solved");
-        //     println!("{}", state);
-        //     while old_state.is_some() {
-        //         println!("{}", old_state.unwrap());
-        //         old_state = old_state.as_ref().unwrap().old_state.as_ref();
-        //     }
-        // }
+        let mut old_state = state.old_state.as_ref();
+        println!("printing solved");
+        println!("{}", state);
+        while old_state.is_some() {
+            println!("{}", old_state.unwrap());
+            old_state = old_state.as_ref().unwrap().old_state.as_ref();
+        }
         *current_best_score = (*current_best_score).min(state.energy);
         return;
     }
 
     for (coord, tile) in state.get_nonsolved_tiles() {
         let target_coords = tile.get_target_coords();
-        // letter is in the bottom of desired spot
-        if *coord == target_coords[1] {
-            // if letter in top spot also matches, mark this one as complete
-            if state.map.get(&target_coords[0]).unwrap() == tile {
-                let mut state = state.create_next();
-                state.locations_solved.insert(tile.clone());
-                next_moves(state, current_best_score);
-            }
-            continue;
-        } else if (*coord == target_coords[0] && state.map.get(&target_coords[1]).unwrap() != tile)
-            || coord.1 == 2
-            || coord.1 == 3
+        // if letters are solved, mark this one as complete
+        if target_coords
+            .iter()
+            .filter(|c| state.map.get(c).unwrap() == tile)
+            .count()
+            == 4
         {
-            // letter is right spot but needs to move out so the letter below it can move
-            // OR its in the wrong slot and needs to move out
-            for to_coord in &state.get_possible_hallway_tiles(coord) {
-                let mut state = state.create_next();
-                state.map.insert(*coord, Tile::Empty);
-                state.map.insert(*to_coord, tile.clone());
-                state.energy +=
-                    (tile.get_energy_cost() * manhatten_distance(coord, to_coord)) as usize;
-                next_moves(state, current_best_score);
-            }
+            let mut state = state.create_next();
+            state.locations_solved.insert(tile.clone());
+            next_moves(state, current_best_score);
+            continue;
+        }
+
+        if (*coord == target_coords[0]
+            && (state.map.get(&target_coords[1]).unwrap() != tile
+                || state.map.get(&target_coords[2]).unwrap() != tile
+                || state.map.get(&target_coords[3]).unwrap() != tile))
+            || (*coord == target_coords[1]
+                && *state.map.get(&target_coords[0]).unwrap() == Tile::Empty
+                && (state.map.get(&target_coords[2]).unwrap() != tile
+                    || state.map.get(&target_coords[3]).unwrap() != tile))
+            || (*coord == target_coords[2]
+                && *state.map.get(&target_coords[0]).unwrap() == Tile::Empty
+                && *state.map.get(&target_coords[1]).unwrap() == Tile::Empty
+                && state.map.get(&target_coords[3]).unwrap() != tile)
+            || (coord.1 == target_coords[3].1
+                && *state.map.get(&target_coords[0]).unwrap() == Tile::Empty
+                && *state.map.get(&target_coords[1]).unwrap() == Tile::Empty
+                && *state.map.get(&target_coords[2]).unwrap() == Tile::Empty)
+        {
+            move_letter_out_of_way(&state, coord, tile, current_best_score);
         } else if coord.1 == 1 {
             // y coord is 1, so is out of slot
+            // definitely an ugly solution here, my p1 answer did not scale :)
             let first_tile = state.map.get(&target_coords[0]).unwrap();
             let second_tile = state.map.get(&target_coords[1]).unwrap();
-            let can_move_into_bottom_spot =
-                *first_tile == Tile::Empty && *second_tile == Tile::Empty;
+            let third_tile = state.map.get(&target_coords[2]).unwrap();
+            let fourth_tile = state.map.get(&target_coords[3]).unwrap();
+
+            let can_move_into_fourth_spot = *first_tile == Tile::Empty
+                && *second_tile == Tile::Empty
+                && *third_tile == Tile::Empty
+                && *fourth_tile == Tile::Empty;
+            let can_move_into_third_spot = *first_tile == Tile::Empty
+                && *second_tile == Tile::Empty
+                && *third_tile == Tile::Empty
+                && *fourth_tile == *tile;
+            let can_move_into_second_spot = *first_tile == Tile::Empty
+                && *second_tile == Tile::Empty
+                && *third_tile == *tile
+                && *fourth_tile == *tile;
             let can_move_into_top_spot = *first_tile == Tile::Empty && *second_tile == *tile;
 
-            // because of the first two boolean checks, we can just use the first target coord as the endpoint safely
-            if (can_move_into_bottom_spot || can_move_into_top_spot)
+            // because of the first boolean check, we can just use the first target coord as the endpoint safely
+            if (can_move_into_second_spot
+                || can_move_into_top_spot
+                || can_move_into_fourth_spot
+                || can_move_into_third_spot)
                 && state.path_is_clear(coord, &target_coords[0])
             {
-                // both empty, can move into bottom spot
-                if can_move_into_bottom_spot {
-                    let mut state = state.create_next();
-                    state.map.insert(*coord, Tile::Empty);
-                    state.energy += (tile.get_energy_cost()
-                        * manhatten_distance(coord, &target_coords[1]))
-                        as usize;
-                    state.map.insert(target_coords[1], tile.clone());
-                    // println!("Moving into bottom {} {}", tile, state);
-                    next_moves(state, current_best_score);
-                } else if can_move_into_top_spot {
-                    // top spot is empty, and bottom spot has the same tile value as our current letter
-                    let mut state = state.create_next();
-                    state.map.insert(*coord, Tile::Empty);
-                    state.energy += (tile.get_energy_cost()
-                        * manhatten_distance(coord, &target_coords[0]))
-                        as usize;
-                    state.locations_solved.insert(tile.clone());
-                    state.map.insert(target_coords[0], tile.clone());
-                    // println!("Moving into top {} {}", tile, state);
-                    next_moves(state, current_best_score);
-                }
+                let resulting_coord = if can_move_into_top_spot {
+                    target_coords[0]
+                } else if can_move_into_second_spot {
+                    target_coords[1]
+                } else if can_move_into_third_spot {
+                    target_coords[2]
+                } else {
+                    target_coords[3]
+                };
+
+                let mut state = state.create_next();
+                state.map.insert(*coord, Tile::Empty);
+                state.energy +=
+                    (tile.get_energy_cost() * manhatten_distance(coord, &resulting_coord)) as usize;
+                state.map.insert(resulting_coord, tile.clone());
+                next_moves(state, current_best_score);
             }
         }
     }
