@@ -228,9 +228,11 @@ fn next_moves(state: State, current_best_score: &mut usize) {
                 && *state.map.get(&target_coords[1]).unwrap() == Tile::Empty
                 && state.map.get(&target_coords[3]).unwrap() != tile)
             || (coord.1 == target_coords[3].1
+                && coord.0 != target_coords[3].0
                 && *state.map.get(&target_coords[0]).unwrap() == Tile::Empty
                 && *state.map.get(&target_coords[1]).unwrap() == Tile::Empty
                 && *state.map.get(&target_coords[2]).unwrap() == Tile::Empty)
+            || (coord.1 >= 2 && coord.0 != target_coords[0].0)
         {
             move_letter_out_of_way(&state, coord, tile, current_best_score);
         } else if coord.1 == 1 {
@@ -253,7 +255,10 @@ fn next_moves(state: State, current_best_score: &mut usize) {
                 && *second_tile == Tile::Empty
                 && *third_tile == *tile
                 && *fourth_tile == *tile;
-            let can_move_into_top_spot = *first_tile == Tile::Empty && *second_tile == *tile;
+            let can_move_into_top_spot = *first_tile == Tile::Empty
+                && *second_tile == *tile
+                && *third_tile == *tile
+                && *fourth_tile == *tile;
 
             // because of the first boolean check, we can just use the first target coord as the endpoint safely
             if (can_move_into_second_spot
