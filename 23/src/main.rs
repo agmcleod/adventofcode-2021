@@ -189,13 +189,13 @@ fn next_moves(state: State, current_best_score: &mut usize) {
         return;
     }
     if state.locations_solved.len() == 4 {
-        let mut old_state = state.old_state.as_ref();
-        println!("printing solved");
-        println!("{}", state);
-        while old_state.is_some() {
-            println!("{}", old_state.unwrap());
-            old_state = old_state.as_ref().unwrap().old_state.as_ref();
-        }
+        // let mut old_state = state.old_state.as_ref();
+        // println!("printing solved");
+        // println!("{}", state);
+        // while old_state.is_some() {
+        //     println!("{}", old_state.unwrap());
+        //     old_state = old_state.as_ref().unwrap().old_state.as_ref();
+        // }
         *current_best_score = (*current_best_score).min(state.energy);
         return;
     }
