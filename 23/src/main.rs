@@ -175,13 +175,22 @@ impl Eq for State {}
 
 impl PartialOrd for State {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.energy.cmp(&other.energy))
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for State {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.cmp(other)
+        other.energy.cmp(&self.energy)
+    }
+}
+
+fn print_history(state: State) {
+    let mut old_state = state.old_state.as_ref();
+    println!("{}", state);
+    while old_state.is_some() {
+        println!("{}", old_state.unwrap());
+        old_state = old_state.as_ref().unwrap().old_state.as_ref();
     }
 }
 
@@ -202,7 +211,7 @@ fn move_letter_out_of_way(work: &mut BinaryHeap<State>, state: &State, coord: &C
 fn process_moves(mut work: BinaryHeap<State>) {
     while let Some(state) = work.pop() {
         if state.locations_solved.len() == 4 {
-            println!("{}", state.energy);
+            print_history(state);
             return;
         }
 
@@ -211,9 +220,9 @@ fn process_moves(mut work: BinaryHeap<State>) {
             // if letters are solved, mark this one as complete
             if target_coords
                 .iter()
-                .filter(|c| state.map.get(c).unwrap() == tile)
+                .filter(|c| state.map.contains_key(c) && state.map.get(c).unwrap() == tile)
                 .count()
-                == 4
+                == 2
             {
                 let mut state = state.create_next();
                 state.locations_solved.insert(tile.clone());
@@ -221,23 +230,10 @@ fn process_moves(mut work: BinaryHeap<State>) {
                 continue;
             }
 
-            if (*coord == target_coords[0]
-                && (state.map.get(&target_coords[1]).unwrap() != tile
-                    || state.map.get(&target_coords[2]).unwrap() != tile
-                    || state.map.get(&target_coords[3]).unwrap() != tile))
-                || (*coord == target_coords[1]
-                    && *state.map.get(&target_coords[0]).unwrap() == Tile::Empty
-                    && (state.map.get(&target_coords[2]).unwrap() != tile
-                        || state.map.get(&target_coords[3]).unwrap() != tile))
-                || (*coord == target_coords[2]
-                    && *state.map.get(&target_coords[0]).unwrap() == Tile::Empty
-                    && *state.map.get(&target_coords[1]).unwrap() == Tile::Empty
-                    && state.map.get(&target_coords[3]).unwrap() != tile)
-                || (coord.1 == target_coords[3].1
-                    && coord.0 != target_coords[3].0
-                    && *state.map.get(&target_coords[0]).unwrap() == Tile::Empty
-                    && *state.map.get(&target_coords[1]).unwrap() == Tile::Empty
-                    && *state.map.get(&target_coords[2]).unwrap() == Tile::Empty)
+            if (*coord == target_coords[0] && state.map.get(&target_coords[1]).unwrap() != tile)
+                || (coord.1 == target_coords[1].1
+                    && coord.0 != target_coords[1].0
+                    && *state.map.get(&target_coords[0]).unwrap() == Tile::Empty)
                 || (coord.1 >= 2 && coord.0 != target_coords[0].0)
             {
                 move_letter_out_of_way(&mut work, &state, coord, tile);
@@ -246,41 +242,19 @@ fn process_moves(mut work: BinaryHeap<State>) {
                 // definitely an ugly solution here, my p1 answer did not scale :)
                 let first_tile = state.map.get(&target_coords[0]).unwrap();
                 let second_tile = state.map.get(&target_coords[1]).unwrap();
-                let third_tile = state.map.get(&target_coords[2]).unwrap();
-                let fourth_tile = state.map.get(&target_coords[3]).unwrap();
 
-                let can_move_into_fourth_spot = *first_tile == Tile::Empty
-                    && *second_tile == Tile::Empty
-                    && *third_tile == Tile::Empty
-                    && *fourth_tile == Tile::Empty;
-                let can_move_into_third_spot = *first_tile == Tile::Empty
-                    && *second_tile == Tile::Empty
-                    && *third_tile == Tile::Empty
-                    && *fourth_tile == *tile;
-                let can_move_into_second_spot = *first_tile == Tile::Empty
-                    && *second_tile == Tile::Empty
-                    && *third_tile == *tile
-                    && *fourth_tile == *tile;
-                let can_move_into_top_spot = *first_tile == Tile::Empty
-                    && *second_tile == *tile
-                    && *third_tile == *tile
-                    && *fourth_tile == *tile;
+                let can_move_into_top_spot = *first_tile == Tile::Empty && *second_tile == *tile;
+                let can_move_into_second_spot =
+                    *first_tile == Tile::Empty && *second_tile == Tile::Empty;
 
                 // because of the first boolean check, we can just use the first target coord as the endpoint safely
-                if (can_move_into_second_spot
-                    || can_move_into_top_spot
-                    || can_move_into_fourth_spot
-                    || can_move_into_third_spot)
+                if (can_move_into_second_spot || can_move_into_top_spot)
                     && state.path_is_clear(coord, &target_coords[0])
                 {
                     let resulting_coord = if can_move_into_top_spot {
                         target_coords[0]
-                    } else if can_move_into_second_spot {
-                        target_coords[1]
-                    } else if can_move_into_third_spot {
-                        target_coords[2]
                     } else {
-                        target_coords[3]
+                        target_coords[1]
                     };
 
                     let mut state = state.create_next();
