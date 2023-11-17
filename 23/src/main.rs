@@ -6,6 +6,7 @@ use read_input::read_text;
 
 type Coord = (i32, i32);
 type Map = HashMap<Coord, Tile>;
+type StateEncountersKey = ([Coord; 2], [Coord; 2], [Coord; 2], [Coord; 2]);
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 enum Tile {
@@ -115,6 +116,28 @@ impl State {
             .collect()
     }
 
+    fn get_coords_for_letter(&self, letter: Tile) -> Vec<Coord> {
+        self.map
+            .iter()
+            .filter(|(_, tile)| **tile == letter)
+            .map(|(coord, _)| coord.to_owned())
+            .collect()
+    }
+
+    fn get_letter_tiles_as_key(&self) -> StateEncountersKey {
+        let a_coords: Vec<Coord> = self.get_coords_for_letter(Tile::A);
+        let b_coords: Vec<Coord> = self.get_coords_for_letter(Tile::B);
+        let c_coords: Vec<Coord> = self.get_coords_for_letter(Tile::C);
+        let d_coords: Vec<Coord> = self.get_coords_for_letter(Tile::D);
+
+        (
+            [a_coords[0], a_coords[1]],
+            [b_coords[0], b_coords[1]],
+            [c_coords[0], c_coords[1]],
+            [d_coords[0], d_coords[1]],
+        )
+    }
+
     fn path_is_clear(&self, from: &Coord, to: &Coord) -> bool {
         // since we're dealing with a fairly strict map, we can check y axis more deliberately
         if from.1 != to.1 {
@@ -198,23 +221,28 @@ fn manhatten_distance(coord1: &Coord, coord2: &Coord) -> i32 {
     (coord1.0 - coord2.0).unsigned_abs() as i32 + (coord1.1 - coord2.1).unsigned_abs() as i32
 }
 
-fn move_letter_out_of_way(work: &mut BinaryHeap<State>, state: &State, coord: &Coord, tile: &Tile) {
+fn move_letter_out_of_way(
+    work: &mut BinaryHeap<State>,
+    encountered_positions: &HashSet<StateEncountersKey>,
+    state: &State,
+    coord: &Coord,
+    tile: &Tile,
+) {
     for to_coord in &state.get_possible_hallway_tiles(coord) {
         let mut state = state.create_next();
         state.map.insert(*coord, Tile::Empty);
         state.map.insert(*to_coord, tile.clone());
         state.energy += (tile.get_energy_cost() * manhatten_distance(coord, to_coord)) as usize;
-        work.push(state);
+        if !encountered_positions.contains(&state.get_letter_tiles_as_key()) {
+            work.push(state);
+        }
     }
 }
 
 fn process_moves(mut work: BinaryHeap<State>) {
+    let mut encountered_positions = HashSet::new();
     while let Some(state) = work.pop() {
-        if state.locations_solved.len() == 4 {
-            print_history(state);
-            return;
-        }
-
+        encountered_positions.insert(state.get_letter_tiles_as_key());
         for (coord, tile) in state.get_nonsolved_tiles() {
             let target_coords = tile.get_target_coords();
             // if letters are solved, mark this one as complete
@@ -226,8 +254,14 @@ fn process_moves(mut work: BinaryHeap<State>) {
             {
                 let mut state = state.create_next();
                 state.locations_solved.insert(tile.clone());
-                work.push(state);
-                continue;
+                if state.locations_solved.len() == 4 {
+                    encountered_positions.insert(state.get_letter_tiles_as_key());
+                    print_history(state);
+                    return;
+                } else if !encountered_positions.contains(&state.get_letter_tiles_as_key()) {
+                    work.push(state);
+                    continue;
+                }
             }
 
             if (*coord == target_coords[0] && state.map.get(&target_coords[1]).unwrap() != tile)
@@ -236,7 +270,7 @@ fn process_moves(mut work: BinaryHeap<State>) {
                     && *state.map.get(&target_coords[0]).unwrap() == Tile::Empty)
                 || (coord.1 >= 2 && coord.0 != target_coords[0].0)
             {
-                move_letter_out_of_way(&mut work, &state, coord, tile);
+                move_letter_out_of_way(&mut work, &encountered_positions, &state, coord, tile);
             } else if coord.1 == 1 {
                 // y coord is 1, so is out of slot
                 // definitely an ugly solution here, my p1 answer did not scale :)
@@ -263,7 +297,9 @@ fn process_moves(mut work: BinaryHeap<State>) {
                         * manhatten_distance(coord, &resulting_coord))
                         as usize;
                     state.map.insert(resulting_coord, tile.clone());
-                    work.push(state);
+                    if !encountered_positions.contains(&state.get_letter_tiles_as_key()) {
+                        work.push(state);
+                    }
                 }
             }
         }
