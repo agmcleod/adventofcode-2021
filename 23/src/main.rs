@@ -77,6 +77,7 @@ struct State {
     width: usize,
     height: usize,
     locations_solved: HashSet<Tile>,
+    encountered_states: HashSet<StateEncountersKey>,
 }
 
 impl State {
@@ -88,6 +89,7 @@ impl State {
             width,
             height,
             locations_solved: HashSet::new(),
+            encountered_states: HashSet::new(),
         }
     }
 
@@ -221,28 +223,26 @@ fn manhatten_distance(coord1: &Coord, coord2: &Coord) -> i32 {
     (coord1.0 - coord2.0).unsigned_abs() as i32 + (coord1.1 - coord2.1).unsigned_abs() as i32
 }
 
-fn move_letter_out_of_way(
-    work: &mut BinaryHeap<State>,
-    encountered_positions: &HashSet<StateEncountersKey>,
-    state: &State,
-    coord: &Coord,
-    tile: &Tile,
-) {
+fn move_letter_out_of_way(work: &mut BinaryHeap<State>, state: &State, coord: &Coord, tile: &Tile) {
     for to_coord in &state.get_possible_hallway_tiles(coord) {
         let mut state = state.create_next();
         state.map.insert(*coord, Tile::Empty);
         state.map.insert(*to_coord, tile.clone());
         state.energy += (tile.get_energy_cost() * manhatten_distance(coord, to_coord)) as usize;
-        if !encountered_positions.contains(&state.get_letter_tiles_as_key()) {
+        if !state
+            .encountered_states
+            .contains(&state.get_letter_tiles_as_key())
+        {
             work.push(state);
         }
     }
 }
 
 fn process_moves(mut work: BinaryHeap<State>) {
-    let mut encountered_positions = HashSet::new();
-    while let Some(state) = work.pop() {
-        encountered_positions.insert(state.get_letter_tiles_as_key());
+    while let Some(mut state) = work.pop() {
+        state
+            .encountered_states
+            .insert(state.get_letter_tiles_as_key());
         for (coord, tile) in state.get_nonsolved_tiles() {
             let target_coords = tile.get_target_coords();
             // if letters are solved, mark this one as complete
@@ -255,10 +255,12 @@ fn process_moves(mut work: BinaryHeap<State>) {
                 let mut state = state.create_next();
                 state.locations_solved.insert(tile.clone());
                 if state.locations_solved.len() == 4 {
-                    encountered_positions.insert(state.get_letter_tiles_as_key());
                     print_history(state);
                     return;
-                } else if !encountered_positions.contains(&state.get_letter_tiles_as_key()) {
+                } else if !state
+                    .encountered_states
+                    .contains(&state.get_letter_tiles_as_key())
+                {
                     work.push(state);
                     continue;
                 }
@@ -270,7 +272,7 @@ fn process_moves(mut work: BinaryHeap<State>) {
                     && *state.map.get(&target_coords[0]).unwrap() == Tile::Empty)
                 || (coord.1 >= 2 && coord.0 != target_coords[0].0)
             {
-                move_letter_out_of_way(&mut work, &encountered_positions, &state, coord, tile);
+                move_letter_out_of_way(&mut work, &state, coord, tile);
             } else if coord.1 == 1 {
                 // y coord is 1, so is out of slot
                 // definitely an ugly solution here, my p1 answer did not scale :)
@@ -297,7 +299,10 @@ fn process_moves(mut work: BinaryHeap<State>) {
                         * manhatten_distance(coord, &resulting_coord))
                         as usize;
                     state.map.insert(resulting_coord, tile.clone());
-                    if !encountered_positions.contains(&state.get_letter_tiles_as_key()) {
+                    if !state
+                        .encountered_states
+                        .contains(&state.get_letter_tiles_as_key())
+                    {
                         work.push(state);
                     }
                 }
