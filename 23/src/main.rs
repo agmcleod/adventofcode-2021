@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::fmt::Display;
 use std::io::Result;
@@ -8,22 +9,22 @@ type Coord = (i32, i32);
 type Map = HashMap<Coord, Tile>;
 type StateEncountersKey = ([Coord; 2], [Coord; 2], [Coord; 2], [Coord; 2]);
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq, PartialOrd, Ord)]
 enum Tile {
-    Empty,
     A,
     B,
     C,
     D,
+    Empty,
 }
 
 impl Tile {
-    fn get_target_coords(&self) -> [Coord; 4] {
+    fn get_target_coords(&self) -> [Coord; 2] {
         match *self {
-            Tile::A => [(3, 2), (3, 3), (3, 4), (3, 5)],
-            Tile::B => [(5, 2), (5, 3), (5, 4), (5, 5)],
-            Tile::C => [(7, 2), (7, 3), (7, 4), (7, 5)],
-            Tile::D => [(9, 2), (9, 3), (9, 4), (9, 5)],
+            Tile::A => [(3, 2), (3, 3)],
+            Tile::B => [(5, 2), (5, 3)],
+            Tile::C => [(7, 2), (7, 3)],
+            Tile::D => [(9, 2), (9, 3)],
             _ => panic!("Invalid location empty"),
         }
     }
@@ -118,25 +119,23 @@ impl State {
             .collect()
     }
 
-    fn get_coords_for_letter(&self, letter: Tile) -> Vec<Coord> {
-        self.map
-            .iter()
-            .filter(|(_, tile)| **tile == letter)
-            .map(|(coord, _)| coord.to_owned())
-            .collect()
-    }
-
     fn get_letter_tiles_as_key(&self) -> StateEncountersKey {
-        let a_coords: Vec<Coord> = self.get_coords_for_letter(Tile::A);
-        let b_coords: Vec<Coord> = self.get_coords_for_letter(Tile::B);
-        let c_coords: Vec<Coord> = self.get_coords_for_letter(Tile::C);
-        let d_coords: Vec<Coord> = self.get_coords_for_letter(Tile::D);
+        let mut sorted: Vec<((i32, i32), Tile)> = self
+            .map
+            .iter()
+            .map(|(coord, tile)| (*coord, tile.clone()))
+            .collect();
+
+        sorted.sort_by(|a, b| match a.1.cmp(&b.1) {
+            Ordering::Equal => a.0.cmp(&b.0),
+            _ => a.1.cmp(&b.1),
+        });
 
         (
-            [a_coords[0], a_coords[1]],
-            [b_coords[0], b_coords[1]],
-            [c_coords[0], c_coords[1]],
-            [d_coords[0], d_coords[1]],
+            [sorted[0].0, sorted[1].0],
+            [sorted[2].0, sorted[3].0],
+            [sorted[4].0, sorted[5].0],
+            [sorted[6].0, sorted[7].0],
         )
     }
 
@@ -243,12 +242,13 @@ fn process_moves(mut work: BinaryHeap<State>) {
         state
             .encountered_states
             .insert(state.get_letter_tiles_as_key());
+        // println!("{} {}", state.energy, state.locations_solved.len());
         for (coord, tile) in state.get_nonsolved_tiles() {
             let target_coords = tile.get_target_coords();
             // if letters are solved, mark this one as complete
             if target_coords
                 .iter()
-                .filter(|c| state.map.contains_key(c) && state.map.get(c).unwrap() == tile)
+                .filter(|c| state.map.get(c).unwrap() == tile)
                 .count()
                 == 2
             {
@@ -257,19 +257,14 @@ fn process_moves(mut work: BinaryHeap<State>) {
                 if state.locations_solved.len() == 4 {
                     print_history(state);
                     return;
-                } else if !state
-                    .encountered_states
-                    .contains(&state.get_letter_tiles_as_key())
-                {
+                } else {
                     work.push(state);
                     continue;
                 }
             }
 
-            if (*coord == target_coords[0] && state.map.get(&target_coords[1]).unwrap() != tile)
-                || (coord.1 == target_coords[1].1
-                    && coord.0 != target_coords[1].0
-                    && *state.map.get(&target_coords[0]).unwrap() == Tile::Empty)
+            if (*coord == target_coords[0] && state.map.get(&target_coords[1]).unwrap() != tile) // tile is in right first spot, but not second spot
+                // or it is in a spot but in the wrong column
                 || (coord.1 >= 2 && coord.0 != target_coords[0].0)
             {
                 move_letter_out_of_way(&mut work, &state, coord, tile);
@@ -349,5 +344,36 @@ mod tests {
         assert_eq!(manhatten_distance(&(1, 1), &(6, 2)), 6);
         assert_eq!(manhatten_distance(&(6, 2), &(1, 1)), 6);
         assert_eq!(manhatten_distance(&(10, 1), &(9, 2)), 2);
+    }
+
+    #[test]
+    fn test_get_letter_tiles_as_key() {
+        let mut map: HashMap<(i32, i32), Tile> = HashMap::new();
+        map.insert((1, 0), Tile::Empty);
+        map.insert((2, 0), Tile::Empty);
+        map.insert((3, 2), Tile::A);
+        map.insert((3, 3), Tile::A);
+        map.insert((4, 2), Tile::Empty);
+        map.insert((5, 3), Tile::B);
+        map.insert((5, 2), Tile::B);
+        map.insert((7, 2), Tile::C);
+        map.insert((7, 3), Tile::C);
+        map.insert((9, 3), Tile::D);
+        map.insert((9, 2), Tile::D);
+        map.insert((10, 1), Tile::Empty);
+        map.insert((10, 2), Tile::Empty);
+        map.insert((10, 3), Tile::Empty);
+
+        let state = State::new(map, 14, 5);
+
+        assert_eq!(
+            state.get_letter_tiles_as_key(),
+            (
+                [(3, 2), (3, 3)],
+                [(5, 2), (5, 3)],
+                [(7, 2), (7, 3)],
+                [(9, 2), (9, 3)],
+            )
+        )
     }
 }
