@@ -7,7 +7,7 @@ use read_input::read_text;
 
 type Coord = (i32, i32);
 type Map = HashMap<Coord, Tile>;
-type StateEncountersKey = (usize, [Coord; 2], [Coord; 2], [Coord; 2], [Coord; 2]);
+type StateEncountersKey = (usize, [Coord; 4], [Coord; 4], [Coord; 4], [Coord; 4]);
 
 #[derive(Clone, Eq, Hash, PartialEq, PartialOrd, Ord)]
 enum Tile {
@@ -19,12 +19,12 @@ enum Tile {
 }
 
 impl Tile {
-    fn get_target_coords(&self) -> [Coord; 2] {
+    fn get_target_coords(&self) -> [Coord; 4] {
         match *self {
-            Tile::A => [(3, 2), (3, 3)],
-            Tile::B => [(5, 2), (5, 3)],
-            Tile::C => [(7, 2), (7, 3)],
-            Tile::D => [(9, 2), (9, 3)],
+            Tile::A => [(3, 2), (3, 3), (3, 4), (3, 5)],
+            Tile::B => [(5, 2), (5, 3), (5, 4), (5, 5)],
+            Tile::C => [(7, 2), (7, 3), (7, 4), (7, 5)],
+            Tile::D => [(9, 2), (9, 3), (9, 4), (9, 5)],
             _ => panic!("Invalid location empty"),
         }
     }
@@ -131,10 +131,10 @@ impl State {
 
         (
             self.locations_solved.len(),
-            [sorted[0].0, sorted[1].0],
-            [sorted[2].0, sorted[3].0],
-            [sorted[4].0, sorted[5].0],
-            [sorted[6].0, sorted[7].0],
+            [sorted[0].0, sorted[1].0, sorted[2].0, sorted[3].0],
+            [sorted[4].0, sorted[5].0, sorted[6].0, sorted[7].0],
+            [sorted[8].0, sorted[9].0, sorted[10].0, sorted[11].0],
+            [sorted[12].0, sorted[13].0, sorted[14].0, sorted[15].0],
         )
     }
 
@@ -259,7 +259,7 @@ fn process_moves(mut work: BinaryHeap<State>) {
                 .iter()
                 .filter(|c| state.map.get(c).unwrap() == tile)
                 .count()
-                == 2
+                == 4
             {
                 let mut state = state.create_next();
                 state.locations_solved.insert(tile.clone());
@@ -273,7 +273,10 @@ fn process_moves(mut work: BinaryHeap<State>) {
                 }
             }
 
-            if (*coord == target_coords[0] && state.map.get(&target_coords[1]).unwrap() != tile) // tile is in right first spot, but not second spot
+            // tile is in right column but is in the way
+            if (coord.1 >= 2 && coord.0 == target_coords[0].0 &&
+                    (state.map.get(&target_coords[1]).unwrap() != tile || state.map.get(&target_coords[2]).unwrap() != tile || state.map.get(&target_coords[3]).unwrap() != tile)
+                )
                 // or it is in a spot but in the wrong column
                 || (coord.1 >= 2 && coord.0 != target_coords[0].0)
             {
@@ -283,19 +286,41 @@ fn process_moves(mut work: BinaryHeap<State>) {
                 // definitely an ugly solution here, my p1 answer did not scale :)
                 let first_tile = state.map.get(&target_coords[0]).unwrap();
                 let second_tile = state.map.get(&target_coords[1]).unwrap();
+                let third_tile = state.map.get(&target_coords[2]).unwrap();
+                let fourth_tile = state.map.get(&target_coords[3]).unwrap();
 
-                let can_move_into_top_spot = *first_tile == Tile::Empty && *second_tile == *tile;
-                let can_move_into_second_spot =
-                    *first_tile == Tile::Empty && *second_tile == Tile::Empty;
+                let can_move_into_top_spot = *first_tile == Tile::Empty
+                    && *second_tile == *tile
+                    && *third_tile == *tile
+                    && *fourth_tile == *tile;
+                let can_move_into_second_spot = *first_tile == Tile::Empty
+                    && *second_tile == Tile::Empty
+                    && *third_tile == *tile
+                    && *fourth_tile == *tile;
+                let can_move_into_third_spot = *first_tile == Tile::Empty
+                    && *second_tile == Tile::Empty
+                    && *third_tile == Tile::Empty
+                    && *fourth_tile == *tile;
+                let can_move_into_fourth_spot = *first_tile == Tile::Empty
+                    && *second_tile == Tile::Empty
+                    && *third_tile == Tile::Empty
+                    && *fourth_tile == Tile::Empty;
 
                 // because of the first boolean check, we can just use the first target coord as the endpoint safely
-                if (can_move_into_second_spot || can_move_into_top_spot)
+                if (can_move_into_second_spot
+                    || can_move_into_top_spot
+                    || can_move_into_third_spot
+                    || can_move_into_fourth_spot)
                     && state.path_is_clear(coord, &target_coords[0])
                 {
                     let resulting_coord = if can_move_into_top_spot {
                         target_coords[0]
-                    } else {
+                    } else if can_move_into_second_spot {
                         target_coords[1]
+                    } else if can_move_into_third_spot {
+                        target_coords[2]
+                    } else {
+                        target_coords[3]
                     };
 
                     let mut state = state.create_next();
@@ -364,13 +389,21 @@ mod tests {
         map.insert((2, 0), Tile::Empty);
         map.insert((3, 2), Tile::A);
         map.insert((3, 3), Tile::A);
+        map.insert((3, 4), Tile::A);
+        map.insert((3, 5), Tile::A);
         map.insert((4, 2), Tile::Empty);
         map.insert((5, 3), Tile::B);
         map.insert((5, 2), Tile::B);
+        map.insert((5, 5), Tile::B);
+        map.insert((5, 4), Tile::B);
+        map.insert((7, 5), Tile::C);
+        map.insert((7, 4), Tile::C);
         map.insert((7, 2), Tile::C);
         map.insert((7, 3), Tile::C);
-        map.insert((9, 3), Tile::D);
         map.insert((9, 2), Tile::D);
+        map.insert((9, 3), Tile::D);
+        map.insert((9, 4), Tile::D);
+        map.insert((9, 5), Tile::D);
         map.insert((10, 1), Tile::Empty);
         map.insert((10, 2), Tile::Empty);
         map.insert((10, 3), Tile::Empty);
@@ -381,10 +414,10 @@ mod tests {
             state.get_state_as_cache_key(),
             (
                 0,
-                [(3, 2), (3, 3)],
-                [(5, 2), (5, 3)],
-                [(7, 2), (7, 3)],
-                [(9, 2), (9, 3)],
+                [(3, 2), (3, 3), (3, 4), (3, 5)],
+                [(5, 2), (5, 3), (5, 4), (5, 5)],
+                [(7, 2), (7, 3), (7, 4), (7, 5)],
+                [(9, 2), (9, 3), (9, 4), (9, 5)],
             )
         )
     }
