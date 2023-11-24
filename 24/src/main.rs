@@ -5,8 +5,6 @@ use std::str::FromStr;
 use read_input::read_text;
 
 type Variables = HashMap<String, i32>;
-type OperationCacheKey = (i32, i32, i32, i32, i32);
-type OperationCache = HashMap<OperationCacheKey, Variables>;
 
 #[derive(Debug, PartialEq, Eq)]
 struct ParseValueError;
@@ -84,11 +82,6 @@ impl FromStr for Instruction {
     }
 }
 
-struct State {
-    input: i32,
-    variables: Variables,
-}
-
 fn get_value_tokens_from_instruction_line(line: &str, instruction_name: &str) -> Vec<String> {
     line.replace(&format!("{} ", instruction_name), "")
         .split(' ')
@@ -109,97 +102,46 @@ fn get_value(variables: &Variables, value: &Value) -> i32 {
     }
 }
 
-fn get_operation_cache_key(variables: &Variables, input: i32) -> OperationCacheKey {
-    let w = variables.get("w").unwrap();
-    let x = variables.get("x").unwrap();
-    let y = variables.get("y").unwrap();
-    let z = variables.get("z").unwrap();
-    (input, *w, *x, *y, *z)
-}
-
 fn run_program(
     instructions: &Vec<Instruction>,
-    operation_cache: &mut OperationCache,
+    variables: &mut Variables,
     input: &Vec<i32>,
 ) -> i32 {
-    let mut variables: Variables = HashMap::new();
-    variables.insert("w".to_string(), 0);
-    variables.insert("x".to_string(), 0);
-    variables.insert("y".to_string(), 0);
-    variables.insert("z".to_string(), 0);
-
     let mut input_iter = input.iter();
-    let mut state_as_of_last_input: Option<State> = None;
-    let mut skip_until_next_input = false;
 
     for instr in instructions {
         match &instr {
             Instruction::Inp(variable) => {
-                check_variable(&variables, variable);
+                check_variable(variables, variable);
 
                 if let Some(input) = input_iter.next() {
-                    if let Some(state_as_of_last_input) = state_as_of_last_input {
-                        operation_cache.insert(
-                            get_operation_cache_key(
-                                &state_as_of_last_input.variables,
-                                state_as_of_last_input.input,
-                            ),
-                            variables.clone(),
-                        );
-                    }
-
-                    let cache_key = get_operation_cache_key(&variables, *input);
-                    if let Some(cache_value) = operation_cache.get(&cache_key) {
-                        for (k, v) in cache_value {
-                            variables.insert(k.to_owned(), *v);
-                        }
-                        skip_until_next_input = true;
-
-                        state_as_of_last_input = None;
-                    } else {
-                        skip_until_next_input = false;
-                        variables.insert(variable.to_owned(), *input);
-
-                        state_as_of_last_input = Some(State {
-                            input: *input,
-                            variables: variables.clone(),
-                        });
-                    }
+                    variables.insert(variable.to_owned(), *input);
                 } else {
                     panic!("Ran out of input {:?}", input);
                 }
             }
             Instruction::Add(variable, value) => {
-                if skip_until_next_input {
-                    continue;
-                }
-                check_variable(&variables, variable);
+                check_variable(variables, variable);
 
-                let value = get_value(&variables, value);
+                let value = get_value(variables, value);
                 variables.insert(
                     variable.to_owned(),
                     *variables.get(variable).unwrap() + value,
                 );
             }
             Instruction::Mul(variable, value) => {
-                if skip_until_next_input {
-                    continue;
-                }
-                check_variable(&variables, variable);
+                check_variable(variables, variable);
 
-                let value = get_value(&variables, value);
+                let value = get_value(variables, value);
                 variables.insert(
                     variable.to_owned(),
                     *variables.get(variable).unwrap() * value,
                 );
             }
             Instruction::Div(variable, value) => {
-                if skip_until_next_input {
-                    continue;
-                }
-                check_variable(&variables, variable);
+                check_variable(variables, variable);
 
-                let value = get_value(&variables, value);
+                let value = get_value(variables, value);
                 if value != 0 {
                     variables.insert(
                         variable.to_owned(),
@@ -208,24 +150,18 @@ fn run_program(
                 }
             }
             Instruction::Mod(variable, value) => {
-                if skip_until_next_input {
-                    continue;
-                }
-                check_variable(&variables, variable);
+                check_variable(variables, variable);
 
-                let value = get_value(&variables, value);
+                let value = get_value(variables, value);
                 let existing_value = *variables.get(variable).unwrap();
                 if existing_value >= 0 && value > 0 {
                     variables.insert(variable.to_owned(), existing_value % value);
                 }
             }
             Instruction::Eql(variable, value) => {
-                if skip_until_next_input {
-                    continue;
-                }
-                check_variable(&variables, variable);
+                check_variable(variables, variable);
 
-                let value = get_value(&variables, value);
+                let value = get_value(variables, value);
                 variables.insert(
                     variable.to_owned(),
                     i32::from(*variables.get(variable).unwrap() == value),
@@ -273,24 +209,28 @@ fn main() -> io::Result<()> {
         }
     }
 
-    let mut model_number = vec![9; 14];
-    let mut operation_cache: OperationCache = HashMap::new();
+    // let mut model_number = vec![9; 14];
 
-    loop {
-        let result = run_program(&instructions, &mut operation_cache, &model_number);
-        if result == 0 {
-            break;
-        }
-        decrement_number(&mut model_number);
-    }
+    // loop {
+    //     let mut variables: Variables = HashMap::new();
+    //     variables.insert("w".to_string(), 0);
+    //     variables.insert("x".to_string(), 0);
+    //     variables.insert("y".to_string(), 0);
+    //     variables.insert("z".to_string(), 0);
+    //     let result = run_program(&instructions, &mut variables, &model_number);
+    //     if result == 0 {
+    //         break;
+    //     }
+    //     decrement_number(&mut model_number);
+    // }
 
-    println!(
-        "{}",
-        model_number
-            .iter()
-            .map(|n| n.to_string())
-            .collect::<String>()
-    );
+    // println!(
+    //     "{}",
+    //     model_number
+    //         .iter()
+    //         .map(|n| n.to_string())
+    //         .collect::<String>()
+    // );
 
     Ok(())
 }
