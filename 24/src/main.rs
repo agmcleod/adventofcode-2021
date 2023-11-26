@@ -200,37 +200,45 @@ fn main() -> io::Result<()> {
     let text = read_text("24/input.txt")?;
 
     let mut instructions = Vec::new();
+    let mut subset = Vec::new();
     for line in text.lines() {
         let instruction: Result<Instruction, ParseInstructionError> = line.parse();
         if let Ok(instruction) = instruction {
-            instructions.push(instruction);
+            match instruction {
+                Instruction::Inp(_) => {
+                    if subset.len() > 0 {
+                        instructions.push(subset);
+                    }
+                    subset = vec![instruction];
+                }
+                _ => {
+                    subset.push(instruction);
+                }
+            }
         } else {
             panic!("Could not parse line: {}", line);
         }
     }
 
-    // let mut model_number = vec![9; 14];
+    if subset.len() > 0 {
+        instructions.push(subset);
+    }
 
-    // loop {
-    //     let mut variables: Variables = HashMap::new();
-    //     variables.insert("w".to_string(), 0);
-    //     variables.insert("x".to_string(), 0);
-    //     variables.insert("y".to_string(), 0);
-    //     variables.insert("z".to_string(), 0);
-    //     let result = run_program(&instructions, &mut variables, &model_number);
-    //     if result == 0 {
-    //         break;
-    //     }
-    //     decrement_number(&mut model_number);
-    // }
+    for (subset_index, subset) in instructions.iter().enumerate() {
+        for z in 0..1_000_000 {
+            for input in 1..=9 {
+                let mut variables: Variables = HashMap::new();
+                variables.insert("w".to_string(), 0);
+                variables.insert("x".to_string(), 0);
+                variables.insert("y".to_string(), 0);
+                variables.insert("z".to_string(), z);
 
-    // println!(
-    //     "{}",
-    //     model_number
-    //         .iter()
-    //         .map(|n| n.to_string())
-    //         .collect::<String>()
-    // );
+                if run_program(subset, &mut variables, &vec![input]) == 0 {
+                    println!("{} - {}", subset_index, z);
+                }
+            }
+        }
+    }
 
     Ok(())
 }
