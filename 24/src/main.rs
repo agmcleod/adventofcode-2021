@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io;
 use std::str::FromStr;
 
@@ -224,7 +224,16 @@ fn main() -> io::Result<()> {
         instructions.push(subset);
     }
 
-    for (subset_index, subset) in instructions.iter().enumerate() {
+    let mut desired_z_outcomes = HashSet::new();
+    let mut list_of_valid_z_outcomes = Vec::new();
+
+    for subset in instructions.iter().rev() {
+        // first time capturing z outcomes, so set it to zero
+        if desired_z_outcomes.len() == 0 {
+            desired_z_outcomes.insert(0);
+        }
+
+        let mut next_outcomes = HashSet::new();
         for z in 0..1_000_000 {
             for input in 1..=9 {
                 let mut variables: Variables = HashMap::new();
@@ -233,12 +242,39 @@ fn main() -> io::Result<()> {
                 variables.insert("y".to_string(), 0);
                 variables.insert("z".to_string(), z);
 
-                if run_program(subset, &mut variables, &vec![input]) == 0 {
-                    println!("{} - {}", subset_index, z);
+                if desired_z_outcomes.contains(&run_program(subset, &mut variables, &vec![input])) {
+                    next_outcomes.insert(z);
                 }
             }
         }
+
+        list_of_valid_z_outcomes.push(next_outcomes.iter().cloned().collect::<Vec<i32>>());
+        desired_z_outcomes = next_outcomes;
     }
+
+    list_of_valid_z_outcomes.reverse();
+
+    let mut sol = vec![];
+    let mut variables: Variables = HashMap::new();
+    variables.insert("w".to_string(), 0);
+    variables.insert("x".to_string(), 0);
+    variables.insert("y".to_string(), 0);
+    variables.insert("z".to_string(), 0);
+    for (subset_i, subset) in instructions.iter().enumerate() {
+        for input in (1..=9).rev() {
+            let result = run_program(subset, &mut variables, &vec![input]);
+            if list_of_valid_z_outcomes[subset_i].contains(&result) {
+                sol.push(input);
+                break;
+            }
+        }
+    }
+
+    println!(
+        "{} {}",
+        sol.iter().map(|n| n.to_string()).collect::<String>(),
+        sol.len()
+    );
 
     Ok(())
 }
